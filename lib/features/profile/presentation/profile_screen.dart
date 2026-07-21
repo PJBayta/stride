@@ -5,10 +5,121 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
-      body: const Center(
-        child: Text('Your personal statistics will appear here.')
+      appBar: AppBar(title: const Text('Athlete Profile'), centerTitle: true),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        children: [
+          Center(
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: colors.primaryContainer,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colors.primary, width: 2),
+                  ),
+                  child: Icon(Icons.person, size: 48, color: colors.onPrimaryContainer),
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 2,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: colors.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: colors.surface, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text('Alex Rivera', textAlign: TextAlign.center, style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text('Member since 2023', textAlign: TextAlign.center, style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          FilledButton(
+            onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile editing is coming soon.'))),
+            child: const Text('EDIT PROFILE'),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('PERFORMANCE SUMMARY', style: text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(color: colors.secondaryContainer, borderRadius: BorderRadius.circular(16)),
+                child: Text('LAST 30 DAYS', style: text.labelSmall?.copyWith(color: colors.onSecondaryContainer, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Row(
+            children: [
+              Expanded(child: _PerformanceCard(icon: Icons.insights, label: 'TOTAL ACTIVITIES', value: '42', unit: 'sets', caption: 'Consistent workout streak')),
+              SizedBox(width: 12),
+              Expanded(child: _PerformanceCard(icon: Icons.trending_up, label: 'TOTAL DISTANCE', value: '156.4', unit: 'km', caption: 'New personal monthly high')),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Row(
+            children: [
+              Expanded(child: _PerformanceCard(icon: Icons.timer_outlined, label: 'TOTAL TIME', value: '24.5', unit: 'hrs', caption: 'Active moving time')),
+              SizedBox(width: 12),
+              Expanded(child: _PerformanceCard(icon: Icons.bolt_outlined, label: 'LONGEST', value: '21.1', unit: 'km', caption: 'Half Marathon · Oct 12')),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PerformanceCard extends StatelessWidget {
+  const _PerformanceCard({required this.icon, required this.label, required this.value, required this.unit, required this.caption});
+  final IconData icon;
+  final String label;
+  final String value;
+  final String unit;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return Card(
+      child: SizedBox(
+        height: 158,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: colors.secondaryContainer, shape: BoxShape.circle),
+                child: Icon(icon, size: 19, color: colors.primary),
+              ),
+              const Spacer(),
+              Text(label, style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
+              RichText(text: TextSpan(style: text.titleLarge?.copyWith(color: colors.onSurface, fontWeight: FontWeight.w700), children: [TextSpan(text: value), TextSpan(text: ' $unit', style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant))])),
+              const SizedBox(height: 7),
+              Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant)),
+            ],
+          ),
+        ),
       ),
     );
   }

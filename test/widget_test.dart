@@ -14,10 +14,35 @@ void main() {
     expect(app.themeMode, ThemeMode.system);
     expect(find.byType(NavigationBar), findsOneWidget);
     expect(find.text('Home'), findsWidgets);
+    expect(find.text('Run Session'), findsOneWidget);
+
+    await tester.tap(find.text('WALK'));
+    await tester.pump();
+
+    expect(find.text('START ACTIVITY'), findsOneWidget);
+
+    await tester.tap(find.text('START ACTIVITY'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Live Session'), findsOneWidget);
+
+    await tester.tap(find.text('Finish'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Session Summary'), findsOneWidget);
+    expect(find.text('Evening Run'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -500));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('HOME'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.history_outlined));
     await tester.pumpAndSettle();
 
-    expect(find.text('Your completed activities will appear here.'), findsOneWidget);
+    expect(find.text('Activity History'), findsOneWidget);
+    expect(find.text('TOTAL DISTANCE THIS MONTH'), findsOneWidget);
+    expect(find.text('RUNNING'), findsOneWidget);
   });
 }
