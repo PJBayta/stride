@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../data/database/app_database.dart';
+import '../../../models/activity_type.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
 
@@ -84,9 +86,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (sheetContext) => FractionallySizedBox(
                       heightFactor: 0.92,
                       child: LiveSessionSheet(
-                        activityLabel: _selectedActivity.label,
-                        activityIcon: _selectedActivity.icon,
-                        onFinish: () => _showSessionSummary(context, sheetContext),
+                        activityType: _selectedActivity,
+                        onFinished: (activity) =>
+                            _showSessionSummary(context, sheetContext, activity),
                       ),
                     ),
                   );
@@ -146,7 +148,11 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showSessionSummary(BuildContext homeContext, BuildContext sheetContext) {
+  void _showSessionSummary(
+    BuildContext homeContext,
+    BuildContext sheetContext,
+    Activity activity,
+  ) {
     Navigator.of(sheetContext).pop();
     showModalBottomSheet<void>(
       context: homeContext,
@@ -156,34 +162,26 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (summaryContext) => FractionallySizedBox(
         heightFactor: 0.92,
         child: SessionSummarySheet(
+          activity: activity,
           onSave: () {
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(homeContext).showSnackBar(
-              const SnackBar(content: Text('Activity saved (placeholder).')),
+              const SnackBar(content: Text('Activity saved.')),
             );
           },
           onHome: () => Navigator.of(summaryContext).pop(),
-          onDiscard: () {
+          onDiscard: () async {
+            await appDatabase.activitiesDao.deleteActivity(activity.id);
+            if (!summaryContext.mounted) return;
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(homeContext).showSnackBar(
-              const SnackBar(content: Text('Activity discarded (placeholder).')),
+              const SnackBar(content: Text('Activity discarded.')),
             );
           },
         ),
       ),
     );
   }
-}
-
-enum ActivityType {
-  run('Run', Icons.directions_run),
-  walk('Walk', Icons.directions_walk),
-  bike('Bike', Icons.directions_bike);
-
-  const ActivityType(this.label, this.icon);
-
-  final String label;
-  final IconData icon;
 }
 
 class _ActivitySelector extends StatelessWidget {

@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/format.dart';
+import '../../../data/database/app_database.dart';
+import '../../../data/repositories/activity_repository.dart';
+import '../../../models/activity_type.dart';
 import '../controller/tracking_controller.dart';
 
 /// Live-session presentation shown while an activity is being tracked.
 ///
-/// Map/route rendering and activity persistence are not implemented yet
-/// (Phase 4 scope is GPS tracking only); the map area remains a visual
-/// placeholder.
+/// Map/route rendering is not implemented yet; the map area remains a
+/// visual placeholder. GPS points are recorded in memory and, on Finish,
+/// saved through [ActivityRepository].
 class LiveSessionSheet extends StatefulWidget {
   const LiveSessionSheet({
     super.key,
-    required this.activityLabel,
-    required this.activityIcon,
-    required this.onFinish,
+    required this.activityType,
+    required this.onFinished,
   });
 
-  final String activityLabel;
-  final IconData activityIcon;
-  final VoidCallback onFinish;
+  final ActivityType activityType;
+
+  /// Called with the persisted [Activity] once a finished session has been
+  /// saved. Not called if the user cancels or if no GPS fix was ever
+  /// received.
+  final ValueChanged<Activity> onFinished;
 
   @override
   State<LiveSessionSheet> createState() => _LiveSessionSheetState();
@@ -25,11 +31,12 @@ class LiveSessionSheet extends StatefulWidget {
 
 class _LiveSessionSheetState extends State<LiveSessionSheet> {
   late final TrackingController _controller;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TrackingController()..start();
+    _controller = TrackingController()..start(activityType: widget.activityType);
   }
 
   @override
@@ -38,9 +45,27 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
     super.dispose();
   }
 
-  void _finish() {
-    _controller.stop();
-    widget.onFinish();
+  void _cancel() {
+    _controller.cancel();
+    Navigator.of(context).pop();
+  }
+
+  Future<void> _finish() async {
+    if (_isSaving) return;
+    final session = _controller.finish();
+    if (session == null) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No GPS data was recorded.')),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final saved = await ActivityRepository(appDatabase).saveSession(session);
+    if (!mounted) return;
+    widget.onFinished(saved);
   }
 
   @override
@@ -65,9 +90,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _isSaving ? null : _cancel,
                         icon: const Icon(Icons.keyboard_arrow_down),
-                        tooltip: 'Close live session',
+                        tooltip: 'Cancel live session',
                       ),
                       Expanded(
                         child: Text(
@@ -111,7 +136,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                       ),
                       Center(
                         child: Icon(
-                          widget.activityIcon,
+                          widget.activityType.icon,
                           size: 36,
                           color: colorScheme.onPrimary,
                         ),
@@ -129,7 +154,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   child: Column(
                     children: [
                       Text(
-                        widget.activityLabel.toUpperCase(),
+                        widget.activityType.label.toUpperCase(),
                         style: textTheme.labelMedium?.copyWith(
                           color: colorScheme.primary,
                           fontWeight: FontWeight.w700,
@@ -138,7 +163,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        _formatElapsed(_controller.elapsed),
+                        formatDuration(_controller.elapsed),
                         style: textTheme.displayLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                           letterSpacing: 2,
@@ -191,9 +216,11 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _controller.isPaused
-                                  ? _controller.resume
-                                  : _controller.pause,
+                              onPressed: _isSaving
+                                  ? null
+                                  : (_controller.isPaused
+                                      ? _controller.resume
+                                      : _controller.pause),
                               icon: Icon(
                                 _controller.isPaused ? Icons.play_arrow : Icons.pause,
                               ),
@@ -203,9 +230,15 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: _finish,
-                              icon: const Icon(Icons.stop_rounded),
-                              label: const Text('Finish'),
+                              onPressed: _isSaving ? null : _finish,
+                              icon: _isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.stop_rounded),
+                              label: Text(_isSaving ? 'Saving…' : 'Finish'),
                             ),
                           ),
                         ],
@@ -220,13 +253,6 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
       ),
     );
   }
-}
-
-String _formatElapsed(Duration duration) {
-  final hours = duration.inHours;
-  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
 }
 
 class _GpsStatusChip extends StatelessWidget {

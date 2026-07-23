@@ -27,8 +27,25 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   int get schemaVersion => 1;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        beforeOpen: (details) async {
+          // SQLite doesn't enforce foreign keys per-connection unless asked;
+          // without this, GpsPoints' onDelete: KeyAction.cascade is a no-op.
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
+      );
 }
 
 QueryExecutor _openConnection() {
   return driftDatabase(name: 'stride');
 }
+
+AppDatabase? _appDatabaseInstance;
+
+/// The single [AppDatabase] instance used by the app. Drift doesn't support
+/// multiple instances safely writing to the same underlying SQLite file, so
+/// callers should always go through this rather than calling `AppDatabase()`
+/// directly.
+AppDatabase get appDatabase => _appDatabaseInstance ??= AppDatabase();
