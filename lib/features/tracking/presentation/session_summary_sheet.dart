@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
+import '../../../features/settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
+import 'route_map_view.dart';
 
 /// Shows [SessionSummarySheet] for an already-saved activity, e.g. when
 /// tapping a card in Home's recent list or the History tab. "Save" just
@@ -24,9 +26,9 @@ Future<void> showActivitySummarySheet(BuildContext context, Activity activity) {
           await appDatabase.activitiesDao.deleteActivity(activity.id);
           if (!sheetContext.mounted) return;
           Navigator.of(sheetContext).pop();
-          ScaffoldMessenger.of(sheetContext).showSnackBar(
-            const SnackBar(content: Text('Activity discarded.')),
-          );
+          ScaffoldMessenger.of(
+            sheetContext,
+          ).showSnackBar(const SnackBar(content: Text('Activity discarded.')));
         },
       ),
     ),
@@ -57,8 +59,10 @@ class SessionSummarySheet extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
     final type = ActivityType.fromDbValue(activity.activityType);
-    final distanceKm = activity.distanceMeters / 1000;
-    final speedKmh = activity.avgSpeed * 3.6;
+    final units = settingsController.measurementUnit;
+    final distance = units.distanceFromMeters(activity.distanceMeters);
+    final speed = units.speedFromMetersPerSecond(activity.avgSpeed);
+    final pace = units.paceFromSecondsPerKm(activity.avgPace);
 
     return Material(
       color: colors.surface,
@@ -80,14 +84,21 @@ class SessionSummarySheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            Text('Session Summary', textAlign: TextAlign.center, style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              'Session Summary',
+              textAlign: TextAlign.center,
+              style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const SizedBox(height: 24),
             Row(
               children: [
                 Container(
                   width: 48,
                   height: 48,
-                  decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   child: Icon(type.icon, color: colors.onPrimary),
                 ),
                 const SizedBox(width: 12),
@@ -95,46 +106,128 @@ class SessionSummarySheet extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('${type.label} Session', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                      Text(formatSessionTimestamp(activity.startTime), style: text.labelMedium?.copyWith(color: colors.onSurfaceVariant)),
+                      Text(
+                        '${type.label} Session',
+                        style: text.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        formatSessionTimestamp(activity.startTime),
+                        style: text.labelMedium?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(color: colors.secondaryContainer, borderRadius: BorderRadius.circular(20)),
-                  child: Text('COMPLETED', style: text.labelSmall?.copyWith(color: colors.onSecondaryContainer, fontWeight: FontWeight.w700)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colors.secondaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'COMPLETED',
+                    style: text.labelSmall?.copyWith(
+                      color: colors.onSecondaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 18),
-            const _GpsMapPlaceholder(),
+            FutureBuilder<List<GpsPoint>>(
+              future: appDatabase.gpsPointsDao.getPointsForActivity(
+                activity.id,
+              ),
+              builder: (context, snapshot) {
+                return RouteMapView(
+                  points: snapshot.data ?? const <GpsPoint>[],
+                );
+              },
+            ),
             const SizedBox(height: 18),
             Row(
               children: [
-                Expanded(child: _SummaryMetric(label: 'DISTANCE', value: distanceKm.toStringAsFixed(2), unit: 'KM')),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'DISTANCE',
+                    value: distance.toStringAsFixed(2),
+                    unit: units.distanceLabel.toUpperCase(),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'DURATION', value: formatDuration(Duration(seconds: activity.durationSeconds)), unit: '')),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'DURATION',
+                    value: formatDuration(
+                      Duration(seconds: activity.durationSeconds),
+                    ),
+                    unit: '',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
-                Expanded(child: _SummaryMetric(label: 'AVG PACE', value: formatPace(activity.avgPace), unit: '/KM')),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'AVG PACE',
+                    value: formatPace(pace),
+                    unit: units.paceLabel.toUpperCase(),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'SPEED', value: speedKmh.toStringAsFixed(1), unit: 'KM/H')),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'SPEED',
+                    value: speed.toStringAsFixed(1),
+                    unit: units.speedLabel.toUpperCase(),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'CALORIES', value: activity.calories.toString(), unit: 'KCAL')),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'CALORIES',
+                    value: activity.calories.toString(),
+                    unit: 'KCAL',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 20),
-            SizedBox(height: 52, child: FilledButton.icon(onPressed: onSave, icon: const Icon(Icons.save_outlined), label: const Text('SAVE ACTIVITY'))),
+            SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: onSave,
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('SAVE ACTIVITY'),
+              ),
+            ),
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: OutlinedButton.icon(onPressed: onHome, icon: const Icon(Icons.home_outlined), label: const Text('HOME'))),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onHome,
+                    icon: const Icon(Icons.home_outlined),
+                    label: const Text('HOME'),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: TextButton.icon(onPressed: onDiscard, icon: const Icon(Icons.delete_outline), label: const Text('DISCARD'))),
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: onDiscard,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('DISCARD'),
+                  ),
+                ),
               ],
             ),
           ],
@@ -144,45 +237,12 @@ class SessionSummarySheet extends StatelessWidget {
   }
 }
 
-class _GpsMapPlaceholder extends StatelessWidget {
-  const _GpsMapPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      height: 180,
-      decoration: BoxDecoration(color: colors.tertiaryContainer, borderRadius: BorderRadius.circular(18)),
-      child: Stack(
-        children: [
-          Center(child: Icon(Icons.map_outlined, size: 64, color: colors.onTertiaryContainer.withValues(alpha: 0.55))),
-          Positioned(
-            top: 12,
-            left: 12,
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: colors.surface.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(18)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.gps_fixed, size: 14, color: colors.primary),
-                    const SizedBox(width: 5),
-                    Text('GPS PLACEHOLDER', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: colors.onSurface, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Center(child: Icon(Icons.directions_run, size: 34, color: colors.primary)),
-        ],
-      ),
-    );
-  }
-}
-
 class _SummaryMetric extends StatelessWidget {
-  const _SummaryMetric({required this.label, required this.value, required this.unit});
+  const _SummaryMetric({
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
   final String label;
   final String value;
   final String unit;
@@ -194,18 +254,38 @@ class _SummaryMetric extends StatelessWidget {
     return Container(
       height: 92,
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: colors.surfaceContainerHighest.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: colors.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           const SizedBox(height: 6),
           FittedBox(
             child: RichText(
               text: TextSpan(
-                style: text.titleLarge?.copyWith(color: colors.onSurface, fontWeight: FontWeight.w700),
-                children: [TextSpan(text: value), TextSpan(text: ' $unit', style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant))],
+                style: text.titleLarge?.copyWith(
+                  color: colors.onSurface,
+                  fontWeight: FontWeight.w700,
+                ),
+                children: [
+                  TextSpan(text: value),
+                  TextSpan(
+                    text: ' $unit',
+                    style: text.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

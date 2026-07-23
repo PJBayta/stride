@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../../data/repositories/activity_repository.dart';
+import '../../../features/settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
 import '../controller/tracking_controller.dart';
 
@@ -36,7 +37,11 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
   @override
   void initState() {
     super.initState();
-    _controller = TrackingController()..start(activityType: widget.activityType);
+    _controller = TrackingController()
+      ..start(
+        activityType: widget.activityType,
+        distanceFilter: settingsController.gpsAccuracy.distanceFilter,
+      );
   }
 
   @override
@@ -116,7 +121,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                       CustomPaint(
                         painter: _MapPlaceholderPainter(
                           routeColor: colorScheme.primary,
-                          lineColor: colorScheme.onTertiaryContainer.withValues(alpha: 0.2),
+                          lineColor: colorScheme.onTertiaryContainer.withValues(
+                            alpha: 0.2,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -149,7 +156,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                   decoration: BoxDecoration(
                     color: colorScheme.surface,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(28),
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -177,14 +186,17 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                           Expanded(
                             child: _Metric(
                               label: 'LATITUDE',
-                              value: position?.latitude.toStringAsFixed(5) ?? '--',
+                              value:
+                                  position?.latitude.toStringAsFixed(5) ?? '--',
                               unit: '',
                             ),
                           ),
                           Expanded(
                             child: _Metric(
                               label: 'LONGITUDE',
-                              value: position?.longitude.toStringAsFixed(5) ?? '--',
+                              value:
+                                  position?.longitude.toStringAsFixed(5) ??
+                                  '--',
                               unit: '',
                             ),
                           ),
@@ -197,15 +209,21 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                             child: _Metric(
                               label: 'SPEED',
                               value: position != null
-                                  ? (position.speed * 3.6).toStringAsFixed(1)
+                                  ? settingsController.measurementUnit
+                                        .speedFromMetersPerSecond(
+                                          position.speed,
+                                        )
+                                        .toStringAsFixed(1)
                                   : '--',
-                              unit: 'km/h',
+                              unit:
+                                  settingsController.measurementUnit.speedLabel,
                             ),
                           ),
                           Expanded(
                             child: _Metric(
                               label: 'ACCURACY',
-                              value: position?.accuracy.toStringAsFixed(1) ?? '--',
+                              value:
+                                  position?.accuracy.toStringAsFixed(1) ?? '--',
                               unit: 'm',
                             ),
                           ),
@@ -219,12 +237,16 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                               onPressed: _isSaving
                                   ? null
                                   : (_controller.isPaused
-                                      ? _controller.resume
-                                      : _controller.pause),
+                                        ? _controller.resume
+                                        : _controller.pause),
                               icon: Icon(
-                                _controller.isPaused ? Icons.play_arrow : Icons.pause,
+                                _controller.isPaused
+                                    ? Icons.play_arrow
+                                    : Icons.pause,
                               ),
-                              label: Text(_controller.isPaused ? 'Resume' : 'Pause'),
+                              label: Text(
+                                _controller.isPaused ? 'Resume' : 'Pause',
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -235,7 +257,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                                   ? const SizedBox(
                                       width: 16,
                                       height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
                                     )
                                   : const Icon(Icons.stop_rounded),
                               label: Text(_isSaving ? 'Saving…' : 'Finish'),
@@ -354,7 +378,10 @@ class _Metric extends StatelessWidget {
 }
 
 class _MapPlaceholderPainter extends CustomPainter {
-  const _MapPlaceholderPainter({required this.routeColor, required this.lineColor});
+  const _MapPlaceholderPainter({
+    required this.routeColor,
+    required this.lineColor,
+  });
 
   final Color routeColor;
   final Color lineColor;
@@ -365,7 +392,11 @@ class _MapPlaceholderPainter extends CustomPainter {
       ..color = lineColor
       ..strokeWidth = 1;
     for (var offset = -size.height; offset < size.width; offset += 32) {
-      canvas.drawLine(Offset(offset, 0), Offset(offset + size.height, size.height), linePaint);
+      canvas.drawLine(
+        Offset(offset, 0),
+        Offset(offset + size.height, size.height),
+        linePaint,
+      );
     }
 
     final routePaint = Paint()
@@ -375,14 +406,27 @@ class _MapPlaceholderPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     final route = Path()
       ..moveTo(size.width * .18, size.height * .83)
-      ..cubicTo(size.width * .12, size.height * .56, size.width * .72, size.height * .64,
-          size.width * .60, size.height * .34)
-      ..cubicTo(size.width * .54, size.height * .17, size.width * .81, size.height * .20,
-          size.width * .86, size.height * .10);
+      ..cubicTo(
+        size.width * .12,
+        size.height * .56,
+        size.width * .72,
+        size.height * .64,
+        size.width * .60,
+        size.height * .34,
+      )
+      ..cubicTo(
+        size.width * .54,
+        size.height * .17,
+        size.width * .81,
+        size.height * .20,
+        size.width * .86,
+        size.height * .10,
+      );
     canvas.drawPath(route, routePaint);
   }
 
   @override
   bool shouldRepaint(_MapPlaceholderPainter oldDelegate) =>
-      routeColor != oldDelegate.routeColor || lineColor != oldDelegate.lineColor;
+      routeColor != oldDelegate.routeColor ||
+      lineColor != oldDelegate.lineColor;
 }

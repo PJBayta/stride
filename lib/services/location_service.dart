@@ -38,11 +38,14 @@ class LocationService {
 
   /// A stream of live position updates. Callers should confirm access via
   /// [requestAccess] first.
-  Stream<Position> watchPosition() {
+  ///
+  /// [distanceFilter] is the minimum distance, in meters, the device must
+  /// move before a new reading is delivered (see `GpsAccuracy`).
+  Stream<Position> watchPosition({int distanceFilter = 2}) {
     return Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
+      locationSettings: LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 2,
+        distanceFilter: distanceFilter,
       ),
     );
   }

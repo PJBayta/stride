@@ -22,7 +22,7 @@ const _assumedWeightKg = 70.0;
 /// persistence to the data layer (see `ActivityRepository`).
 class TrackingController extends ChangeNotifier {
   TrackingController({LocationService? locationService})
-      : _locationService = locationService ?? LocationService();
+    : _locationService = locationService ?? LocationService();
 
   final LocationService _locationService;
 
@@ -32,6 +32,7 @@ class TrackingController extends ChangeNotifier {
   DateTime? _segmentStart;
   DateTime? _sessionStartedAt;
   ActivityType? _activityType;
+  int _distanceFilter = 2;
 
   final List<Position> _recordedPositions = [];
   double _totalDistanceMeters = 0;
@@ -54,7 +55,13 @@ class TrackingController extends ChangeNotifier {
   /// Requests location access and, if granted, starts listening to the GPS
   /// stream and the elapsed timer. On failure, sets [status] to
   /// [TrackingStatus.error] and [errorMessage] with a user-facing reason.
-  Future<void> start({required ActivityType activityType}) async {
+  ///
+  /// [distanceFilter] comes from the user's GPS accuracy setting; see
+  /// `GpsAccuracy`.
+  Future<void> start({
+    required ActivityType activityType,
+    int distanceFilter = 2,
+  }) async {
     if (status == TrackingStatus.tracking) return;
 
     final failure = await _locationService.requestAccess();
@@ -73,6 +80,7 @@ class TrackingController extends ChangeNotifier {
     }
 
     _activityType = activityType;
+    _distanceFilter = distanceFilter;
     _sessionStartedAt = DateTime.now();
     _accumulated = Duration.zero;
     _segmentStart = _sessionStartedAt;
@@ -126,8 +134,12 @@ class TrackingController extends ChangeNotifier {
 
     final totalSeconds = elapsed.inSeconds;
     final distanceKm = _totalDistanceMeters / 1000;
-    final avgSpeedMps = totalSeconds > 0 ? _totalDistanceMeters / totalSeconds : 0.0;
-    final avgPaceSecondsPerKm = distanceKm > 0 ? totalSeconds / distanceKm : 0.0;
+    final avgSpeedMps = totalSeconds > 0
+        ? _totalDistanceMeters / totalSeconds
+        : 0.0;
+    final avgPaceSecondsPerKm = distanceKm > 0
+        ? totalSeconds / distanceKm
+        : 0.0;
     final hours = totalSeconds / 3600;
     final calories = (_activityType!.met * _assumedWeightKg * hours).round();
 
@@ -154,25 +166,27 @@ class TrackingController extends ChangeNotifier {
   }
 
   void _startListening() {
-    _positionSubscription = _locationService.watchPosition().listen(
-      (position) {
-        if (currentPosition != null) {
-          _totalDistanceMeters += Geolocator.distanceBetween(
-            currentPosition!.latitude,
-            currentPosition!.longitude,
-            position.latitude,
-            position.longitude,
-          );
-        }
-        currentPosition = position;
-        _recordedPositions.add(position);
-        notifyListeners();
-      },
-      onError: (Object error) {
-        errorMessage = 'GPS error: $error';
-        notifyListeners();
-      },
-    );
+    _positionSubscription = _locationService
+        .watchPosition(distanceFilter: _distanceFilter)
+        .listen(
+          (position) {
+            if (currentPosition != null) {
+              _totalDistanceMeters += Geolocator.distanceBetween(
+                currentPosition!.latitude,
+                currentPosition!.longitude,
+                position.latitude,
+                position.longitude,
+              );
+            }
+            currentPosition = position;
+            _recordedPositions.add(position);
+            notifyListeners();
+          },
+          onError: (Object error) {
+            errorMessage = 'GPS error: $error';
+            notifyListeners();
+          },
+        );
     _ticker = Timer.periodic(
       const Duration(seconds: 1),
       (_) => notifyListeners(),

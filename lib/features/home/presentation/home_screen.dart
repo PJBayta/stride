@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
+import '../../settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
@@ -24,133 +25,137 @@ class _HomeScreenState extends State<HomeScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Home'),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          children: [
-            Text(
-              'STRIDE ACTIVE',
-              style: textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
+      appBar: AppBar(title: const Text('Home'), centerTitle: true),
+      body: ListenableBuilder(
+        listenable: settingsController,
+        builder: (context, _) => SafeArea(
+          top: false,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            children: [
+              Text(
+                'STRIDE ACTIVE',
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Good Morning!',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+              const SizedBox(height: 4),
+              Text(
+                'Good Morning!',
+                style: textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            const SizedBox(height: 28),
-            Text(
-              'SELECT ACTIVITY',
-              style: textTheme.labelMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
+              const SizedBox(height: 28),
+              Text(
+                'SELECT ACTIVITY',
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: ActivityType.values
-                  .map(
-                    (activity) => Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          right: activity == ActivityType.bike ? 0 : 10,
-                        ),
-                        child: _ActivitySelector(
-                          activity: activity,
-                          isSelected: activity == _selectedActivity,
-                          onTap: () => setState(() => _selectedActivity = activity),
+              const SizedBox(height: 10),
+              Row(
+                children: ActivityType.values
+                    .map(
+                      (activity) => Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: activity == ActivityType.bike ? 0 : 10,
+                          ),
+                          child: _ActivitySelector(
+                            activity: activity,
+                            isSelected: activity == _selectedActivity,
+                            onTap: () =>
+                                setState(() => _selectedActivity = activity),
+                          ),
                         ),
                       ),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: () {
-                  showModalBottomSheet<void>(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (sheetContext) => FractionallySizedBox(
-                      heightFactor: 0.92,
-                      child: LiveSessionSheet(
-                        activityType: _selectedActivity,
-                        onFinished: (activity) =>
-                            _showSessionSummary(context, sheetContext, activity),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: () {
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      useSafeArea: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (sheetContext) => FractionallySizedBox(
+                        heightFactor: 0.92,
+                        child: LiveSessionSheet(
+                          activityType: _selectedActivity,
+                          onFinished: (activity) => _showSessionSummary(
+                            context,
+                            sheetContext,
+                            activity,
+                          ),
+                        ),
                       ),
+                    );
+                  },
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('START ACTIVITY'),
+                ),
+              ),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'RECENT ACTIVITIES',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                     ),
+                  ),
+                  TextButton(onPressed: () {}, child: const Text('See all')),
+                ],
+              ),
+              const SizedBox(height: 8),
+              StreamBuilder<List<Activity>>(
+                stream: appDatabase.activitiesDao.watchAllActivities(),
+                builder: (context, snapshot) {
+                  final activities = snapshot.data ?? const <Activity>[];
+                  if (activities.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Text(
+                        'No activities yet. Start one above!',
+                        textAlign: TextAlign.center,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  }
+
+                  final recent = activities
+                      .take(_recentActivitiesLimit)
+                      .toList();
+                  return Column(
+                    children: [
+                      for (var i = 0; i < recent.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 10),
+                        _RecentActivityCard.fromActivity(
+                          recent[i],
+                          onTap: () =>
+                              showActivitySummarySheet(context, recent[i]),
+                        ),
+                      ],
+                    ],
                   );
                 },
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('START ACTIVITY'),
               ),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'RECENT ACTIVITIES',
-                  style: textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('See all'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            StreamBuilder<List<Activity>>(
-              stream: appDatabase.activitiesDao.watchAllActivities(),
-              builder: (context, snapshot) {
-                final activities = snapshot.data ?? const <Activity>[];
-                if (activities.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Text(
-                      'No activities yet. Start one above!',
-                      textAlign: TextAlign.center,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-
-                final recent = activities.take(_recentActivitiesLimit).toList();
-                return Column(
-                  children: [
-                    for (var i = 0; i < recent.length; i++) ...[
-                      if (i > 0) const SizedBox(height: 10),
-                      _RecentActivityCard.fromActivity(
-                        recent[i],
-                        onTap: () => showActivitySummarySheet(context, recent[i]),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -173,9 +178,9 @@ class _HomeScreenState extends State<HomeScreen> {
           activity: activity,
           onSave: () {
             Navigator.of(summaryContext).pop();
-            ScaffoldMessenger.of(homeContext).showSnackBar(
-              const SnackBar(content: Text('Activity saved.')),
-            );
+            ScaffoldMessenger.of(
+              homeContext,
+            ).showSnackBar(const SnackBar(content: Text('Activity saved.')));
           },
           onHome: () => Navigator.of(summaryContext).pop(),
           onDiscard: () async {
@@ -222,7 +227,9 @@ class _ActivitySelector extends StatelessWidget {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
           side: BorderSide(
-            color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -268,10 +275,12 @@ class _RecentActivityCard extends StatelessWidget {
     required VoidCallback onTap,
   }) {
     final type = ActivityType.fromDbValue(activity.activityType);
+    final units = settingsController.measurementUnit;
     return _RecentActivityCard(
       title: '${type.label} Session',
       detail: formatRelativeSessionTimestamp(activity.startTime),
-      distance: '${(activity.distanceMeters / 1000).toStringAsFixed(2)} km',
+      distance:
+          '${units.distanceFromMeters(activity.distanceMeters).toStringAsFixed(2)} ${units.distanceLabel}',
       duration: formatDuration(Duration(seconds: activity.durationSeconds)),
       icon: type.icon,
       placeholderIcon: type.placeholderIcon,
