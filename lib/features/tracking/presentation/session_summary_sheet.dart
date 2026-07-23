@@ -4,6 +4,35 @@ import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../../models/activity_type.dart';
 
+/// Shows [SessionSummarySheet] for an already-saved activity, e.g. when
+/// tapping a card in Home's recent list or the History tab. "Save" just
+/// closes the sheet; "Discard" deletes the activity (its GPS points
+/// cascade-delete with it).
+Future<void> showActivitySummarySheet(BuildContext context, Activity activity) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) => FractionallySizedBox(
+      heightFactor: 0.92,
+      child: SessionSummarySheet(
+        activity: activity,
+        onSave: () => Navigator.of(sheetContext).pop(),
+        onHome: () => Navigator.of(sheetContext).pop(),
+        onDiscard: () async {
+          await appDatabase.activitiesDao.deleteActivity(activity.id);
+          if (!sheetContext.mounted) return;
+          Navigator.of(sheetContext).pop();
+          ScaffoldMessenger.of(sheetContext).showSnackBar(
+            const SnackBar(content: Text('Activity discarded.')),
+          );
+        },
+      ),
+    ),
+  );
+}
+
 /// Session summary shown after a live session is finished and saved.
 ///
 /// The activity is already persisted by the time this sheet is shown (saving

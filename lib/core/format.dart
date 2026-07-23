@@ -37,3 +37,38 @@ String formatSessionTimestamp(DateTime dateTime) {
   final period = local.hour >= 12 ? 'PM' : 'AM';
   return '$weekday, $month ${local.day} • $hour12:$minute $period';
 }
+
+/// Formats a timestamp as `Today, 6:45 AM`, `Yesterday, 6:45 AM`, or
+/// `Jan 5, 6:45 AM` in local time, for recent-activity style lists.
+String formatRelativeSessionTimestamp(DateTime dateTime, {DateTime? now}) {
+  final local = dateTime.toLocal();
+  final today = (now ?? DateTime.now()).toLocal();
+  final dateOnly = DateTime(local.year, local.month, local.day);
+  final todayOnly = DateTime(today.year, today.month, today.day);
+  final dayDifference = todayOnly.difference(dateOnly).inDays;
+
+  final String dayLabel;
+  if (dayDifference == 0) {
+    dayLabel = 'Today';
+  } else if (dayDifference == 1) {
+    dayLabel = 'Yesterday';
+  } else {
+    dayLabel = '${_monthNames[local.month - 1]} ${local.day}';
+  }
+
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour >= 12 ? 'PM' : 'AM';
+  return '$dayLabel, $hour12:$minute $period';
+}
+
+/// Formats a timestamp as `Oct 24, 2023 • 6:45 AM` in local time, for
+/// chronological history listings.
+String formatHistoryTimestamp(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  final month = _monthNames[local.month - 1];
+  final hour12 = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour >= 12 ? 'PM' : 'AM';
+  return '$month ${local.day}, ${local.year} • $hour12:$minute $period';
+}

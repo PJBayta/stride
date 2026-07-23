@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/format.dart';
+import '../../../data/database/app_database.dart';
+import '../../../models/activity_type.dart';
+import '../../tracking/presentation/session_summary_sheet.dart';
+
+HistoryFilter _filterForActivityType(ActivityType type) => switch (type) {
+      ActivityType.run => HistoryFilter.running,
+      ActivityType.bike => HistoryFilter.cycling,
+      ActivityType.walk => HistoryFilter.walking,
+    };
+
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -14,11 +25,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final activities = _activities
-        .where((activity) =>
-            _selectedFilter == HistoryFilter.all ||
-            activity.type == _selectedFilter)
-        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -108,7 +114,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
-                  'OCTOBER 2023',
+                  'ALL ACTIVITIES',
                   style: text.labelSmall?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -119,23 +125,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ],
           ),
           const SizedBox(height: 20),
-          if (activities.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 48),
-              child: Center(
-                child: Text(
-                  'No ${_selectedFilter.label.toLowerCase()} activities yet.',
-                  style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
-                ),
-              ),
-            )
-          else
-            ...activities.map(
-              (activity) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _ActivityHistoryCard(activity: activity),
-              ),
-            ),
+          StreamBuilder<List<Activity>>(
+            stream: appDatabase.activitiesDao.watchAllActivities(),
+            builder: (context, snapshot) {
+              final allActivities = snapshot.data ?? const <Activity>[];
+              final activities = allActivities
+                  .where(
+                    (activity) =>
+                        _selectedFilter == HistoryFilter.all ||
+                        _filterForActivityType(
+                              ActivityType.fromDbValue(activity.activityType),
+                            ) ==
+                            _selectedFilter,
+                  )
+                  .toList();
+
+              if (activities.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 48),
+                  child: Center(
+                    child: Text(
+                      'No ${_selectedFilter.label.toLowerCase()} activities yet.',
+                      style: text.bodyLarge?.copyWith(color: colors.onSurfaceVariant),
+                    ),
+                  ),
+                );
+              }
+
+              return Column(
+                children: [
+                  for (final activity in activities)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ActivityHistoryCard.fromActivity(
+                        activity,
+                        onTap: () => showActivitySummarySheet(context, activity),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -152,59 +182,43 @@ enum HistoryFilter {
   final String label;
 }
 
-class _ActivityData {
-  const _ActivityData({
-    required this.type,
+class _ActivityHistoryCard extends StatelessWidget {
+  const _ActivityHistoryCard({
+    required this.typeLabel,
     required this.date,
     required this.distance,
     required this.duration,
     required this.energy,
     required this.icon,
     required this.imageIcon,
+    required this.onTap,
   });
 
-  final HistoryFilter type;
+  factory _ActivityHistoryCard.fromActivity(
+    Activity activity, {
+    required VoidCallback onTap,
+  }) {
+    final type = ActivityType.fromDbValue(activity.activityType);
+    return _ActivityHistoryCard(
+      typeLabel: type.label,
+      date: formatHistoryTimestamp(activity.startTime),
+      distance: '${(activity.distanceMeters / 1000).toStringAsFixed(1)} km',
+      duration: formatDuration(Duration(seconds: activity.durationSeconds)),
+      energy: '${activity.calories} kcal',
+      icon: type.icon,
+      imageIcon: type.placeholderIcon,
+      onTap: onTap,
+    );
+  }
+
+  final String typeLabel;
   final String date;
   final String distance;
   final String duration;
   final String energy;
   final IconData icon;
   final IconData imageIcon;
-}
-
-const _activities = [
-  _ActivityData(
-    type: HistoryFilter.running,
-    date: 'Oct 24, 2023 • 07:30 AM',
-    distance: '5.2 km',
-    duration: '28:45',
-    energy: '420 kcal',
-    icon: Icons.directions_run,
-    imageIcon: Icons.terrain_outlined,
-  ),
-  _ActivityData(
-    type: HistoryFilter.cycling,
-    date: 'Oct 22, 2023 • 05:15 PM',
-    distance: '18.5 km',
-    duration: '52:10',
-    energy: '680 kcal',
-    icon: Icons.directions_bike,
-    imageIcon: Icons.route_outlined,
-  ),
-  _ActivityData(
-    type: HistoryFilter.walking,
-    date: 'Oct 21, 2023 • 08:00 AM',
-    distance: '3.1 km',
-    duration: '45:20',
-    energy: '180 kcal',
-    icon: Icons.directions_walk,
-    imageIcon: Icons.park_outlined,
-  ),
-];
-
-class _ActivityHistoryCard extends StatelessWidget {
-  const _ActivityHistoryCard({required this.activity});
-  final _ActivityData activity;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -213,7 +227,7 @@ class _ActivityHistoryCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         child: SizedBox(
           height: 112,
           child: Row(
@@ -223,7 +237,7 @@ class _ActivityHistoryCard extends StatelessWidget {
                 height: double.infinity,
                 color: colors.tertiaryContainer,
                 alignment: Alignment.center,
-                child: Icon(activity.imageIcon, color: colors.onTertiaryContainer),
+                child: Icon(imageIcon, color: colors.onTertiaryContainer),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -235,27 +249,27 @@ class _ActivityHistoryCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            activity.type.label.toUpperCase(),
+                            typeLabel.toUpperCase(),
                             style: text.labelLarge?.copyWith(
                               color: colors.primary,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(width: 6),
-                          Icon(activity.icon, size: 15, color: colors.primary),
+                          Icon(icon, size: 15, color: colors.primary),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        activity.date,
+                        date,
                         style: text.labelSmall?.copyWith(color: colors.onSurfaceVariant),
                       ),
                       const Spacer(),
                       Row(
                         children: [
-                          Expanded(child: _Stat(label: 'DISTANCE', value: activity.distance)),
-                          Expanded(child: _Stat(label: 'TIME', value: activity.duration)),
-                          Expanded(child: _Stat(label: 'ENERGY', value: activity.energy)),
+                          Expanded(child: _Stat(label: 'DISTANCE', value: distance)),
+                          Expanded(child: _Stat(label: 'TIME', value: duration)),
+                          Expanded(child: _Stat(label: 'ENERGY', value: energy)),
                         ],
                       ),
                     ],

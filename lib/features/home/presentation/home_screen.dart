@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../../models/activity_type.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
+
+const _recentActivitiesLimit = 3;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -116,31 +119,36 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            const _RecentActivityCard(
-              title: 'Run Session',
-              detail: 'Today, 06:30 AM',
-              distance: '5.24 km',
-              duration: '28:45',
-              icon: Icons.directions_run,
-              placeholderIcon: Icons.terrain_outlined,
-            ),
-            const SizedBox(height: 10),
-            const _RecentActivityCard(
-              title: 'Bike Session',
-              detail: 'Yesterday, 05:15 PM',
-              distance: '12.80 km',
-              duration: '45:10',
-              icon: Icons.directions_bike,
-              placeholderIcon: Icons.route_outlined,
-            ),
-            const SizedBox(height: 10),
-            const _RecentActivityCard(
-              title: 'Walk Session',
-              detail: 'Oct 24, 08:00 AM',
-              distance: '3.16 km',
-              duration: '35:20',
-              icon: Icons.directions_walk,
-              placeholderIcon: Icons.park_outlined,
+            StreamBuilder<List<Activity>>(
+              stream: appDatabase.activitiesDao.watchAllActivities(),
+              builder: (context, snapshot) {
+                final activities = snapshot.data ?? const <Activity>[];
+                if (activities.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Text(
+                      'No activities yet. Start one above!',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
+
+                final recent = activities.take(_recentActivitiesLimit).toList();
+                return Column(
+                  children: [
+                    for (var i = 0; i < recent.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      _RecentActivityCard.fromActivity(
+                        recent[i],
+                        onTap: () => showActivitySummarySheet(context, recent[i]),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ],
         ),
@@ -252,7 +260,24 @@ class _RecentActivityCard extends StatelessWidget {
     required this.duration,
     required this.icon,
     required this.placeholderIcon,
+    required this.onTap,
   });
+
+  factory _RecentActivityCard.fromActivity(
+    Activity activity, {
+    required VoidCallback onTap,
+  }) {
+    final type = ActivityType.fromDbValue(activity.activityType);
+    return _RecentActivityCard(
+      title: '${type.label} Session',
+      detail: formatRelativeSessionTimestamp(activity.startTime),
+      distance: '${(activity.distanceMeters / 1000).toStringAsFixed(2)} km',
+      duration: formatDuration(Duration(seconds: activity.durationSeconds)),
+      icon: type.icon,
+      placeholderIcon: type.placeholderIcon,
+      onTap: onTap,
+    );
+  }
 
   final String title;
   final String detail;
@@ -260,6 +285,7 @@ class _RecentActivityCard extends StatelessWidget {
   final String duration;
   final IconData icon;
   final IconData placeholderIcon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +295,7 @@ class _RecentActivityCard extends StatelessWidget {
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
         child: SizedBox(
           height: 104,
           child: Row(

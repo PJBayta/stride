@@ -5,14 +5,23 @@ import 'package:flutter/material.dart';
 /// [dbValue] is the canonical string stored in the `activities.activity_type`
 /// column; it must stay stable even if [label] wording changes later.
 enum ActivityType {
-  run('Run', Icons.directions_run, met: 9.8),
-  walk('Walk', Icons.directions_walk, met: 3.8),
-  bike('Bike', Icons.directions_bike, met: 7.5);
+  run('Run', Icons.directions_run, Icons.terrain_outlined, met: 9.8),
+  walk('Walk', Icons.directions_walk, Icons.park_outlined, met: 3.8),
+  bike('Bike', Icons.directions_bike, Icons.route_outlined, met: 7.5);
 
-  const ActivityType(this.label, this.icon, {required this.met});
+  const ActivityType(
+    this.label,
+    this.icon,
+    this.placeholderIcon, {
+    required this.met,
+  });
 
   final String label;
   final IconData icon;
+
+  /// Shown in place of a real route thumbnail, since route rendering isn't
+  /// implemented yet.
+  final IconData placeholderIcon;
 
   /// Metabolic equivalent for this activity, used for a rough calorie
   /// estimate. Not a substitute for a real per-user calorie model (which
