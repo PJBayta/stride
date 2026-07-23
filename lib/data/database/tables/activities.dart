@@ -1,14 +1,10 @@
 import 'package:drift/drift.dart';
 
-/// A single recorded activity (run, walk, ride, ...).
-///
-/// Mirrors the `Activities` entity described in `docs/database.md`. GPS points
-/// and settings live in their own tables and are added in later phases.
 class Activities extends Table {
   /// Primary key. Maps to `ActivityID`.
   IntColumn get id => integer().autoIncrement()();
 
-  /// The kind of activity, e.g. `run`, `walk`, `ride`.
+  /// `run`, `walk`, `ride`.
   TextColumn get activityType => text().withLength(min: 1, max: 50)();
 
   /// When the activity started.

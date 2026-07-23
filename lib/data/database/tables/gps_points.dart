@@ -2,10 +2,6 @@ import 'package:drift/drift.dart';
 
 import 'activities.dart';
 
-/// A single GPS sample belonging to an [Activities] row.
-///
-/// Mirrors the `GPSPoints` entity in `docs/database.md`. Many points belong
-/// to one activity; deleting the activity cascades to its points.
 class GpsPoints extends Table {
   IntColumn get id => integer().autoIncrement()();
 
