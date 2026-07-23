@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 
-/// Placeholder session summary shown after a live session is finished.
+import '../../../core/format.dart';
+import '../../../data/database/app_database.dart';
+import '../../../models/activity_type.dart';
+
+/// Session summary shown after a live session is finished and saved.
+///
+/// The activity is already persisted by the time this sheet is shown (saving
+/// happens on Finish); "Save" here just confirms and closes, while "Discard"
+/// deletes the just-saved row (its GPS points cascade-delete with it).
 class SessionSummarySheet extends StatelessWidget {
   const SessionSummarySheet({
     super.key,
+    required this.activity,
     required this.onSave,
     required this.onHome,
     required this.onDiscard,
   });
 
+  final Activity activity;
   final VoidCallback onSave;
   final VoidCallback onHome;
   final VoidCallback onDiscard;
@@ -17,6 +27,10 @@ class SessionSummarySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final type = ActivityType.fromDbValue(activity.activityType);
+    final distanceKm = activity.distanceMeters / 1000;
+    final speedKmh = activity.avgSpeed * 3.6;
+
     return Material(
       color: colors.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -45,15 +59,15 @@ class SessionSummarySheet extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(color: colors.primary, borderRadius: BorderRadius.circular(14)),
-                  child: Icon(Icons.directions_run, color: colors.onPrimary),
+                  child: Icon(type.icon, color: colors.onPrimary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Evening Run', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-                      Text('Monday, May 22 • 6:45 PM', style: text.labelMedium?.copyWith(color: colors.onSurfaceVariant)),
+                      Text('${type.label} Session', style: text.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(formatSessionTimestamp(activity.startTime), style: text.labelMedium?.copyWith(color: colors.onSurfaceVariant)),
                     ],
                   ),
                 ),
@@ -67,21 +81,21 @@ class SessionSummarySheet extends StatelessWidget {
             const SizedBox(height: 18),
             const _GpsMapPlaceholder(),
             const SizedBox(height: 18),
-            const Row(
+            Row(
               children: [
-                Expanded(child: _SummaryMetric(label: 'DISTANCE', value: '5.24', unit: 'KM')),
-                SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'DURATION', value: '28:42', unit: 'MIN')),
+                Expanded(child: _SummaryMetric(label: 'DISTANCE', value: distanceKm.toStringAsFixed(2), unit: 'KM')),
+                const SizedBox(width: 12),
+                Expanded(child: _SummaryMetric(label: 'DURATION', value: formatDuration(Duration(seconds: activity.durationSeconds)), unit: '')),
               ],
             ),
             const SizedBox(height: 12),
-            const Row(
+            Row(
               children: [
-                Expanded(child: _SummaryMetric(label: 'AVG PACE', value: '5:28', unit: '/KM')),
-                SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'SPEED', value: '11.2', unit: 'KM/H')),
-                SizedBox(width: 12),
-                Expanded(child: _SummaryMetric(label: 'CALORIES', value: '412', unit: 'KCAL')),
+                Expanded(child: _SummaryMetric(label: 'AVG PACE', value: formatPace(activity.avgPace), unit: '/KM')),
+                const SizedBox(width: 12),
+                Expanded(child: _SummaryMetric(label: 'SPEED', value: speedKmh.toStringAsFixed(1), unit: 'KM/H')),
+                const SizedBox(width: 12),
+                Expanded(child: _SummaryMetric(label: 'CALORIES', value: activity.calories.toString(), unit: 'KCAL')),
               ],
             ),
             const SizedBox(height: 20),

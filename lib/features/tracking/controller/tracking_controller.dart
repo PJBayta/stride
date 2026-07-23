@@ -1,18 +1,25 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
 
+import '../../../models/activity_type.dart';
+import '../../../models/finished_session.dart';
 import '../../../services/location_service.dart';
 
 enum TrackingStatus { idle, tracking, error }
 
+/// Assumed body weight used for a rough calorie estimate, in kilograms.
+/// Replace with a real per-user value once Settings/Profile exposes one.
+const _assumedWeightKg = 70.0;
+
 /// Owns GPS tracking state for a single live session: permission/service
-/// checks, the position stream, and an elapsed-time stopwatch.
+/// checks, the position stream, an elapsed-time stopwatch, and the in-memory
+/// route recorded so far.
 ///
-/// Deliberately holds no reference to Flutter widgets or BuildContext, and
-/// has no dependency on activity persistence, so Phase 5's activity
-/// recording can reuse it unchanged.
+/// Deliberately holds no reference to Flutter widgets, BuildContext, or the
+/// database — it produces a plain [FinishedSession] on [finish], leaving
+/// persistence to the data layer (see `ActivityRepository`).
 class TrackingController extends ChangeNotifier {
   TrackingController({LocationService? locationService})
       : _locationService = locationService ?? LocationService();
@@ -23,6 +30,11 @@ class TrackingController extends ChangeNotifier {
   Timer? _ticker;
   Duration _accumulated = Duration.zero;
   DateTime? _segmentStart;
+  DateTime? _sessionStartedAt;
+  ActivityType? _activityType;
+
+  final List<Position> _recordedPositions = [];
+  double _totalDistanceMeters = 0;
 
   TrackingStatus status = TrackingStatus.idle;
   Position? currentPosition;
@@ -30,6 +42,9 @@ class TrackingController extends ChangeNotifier {
   String? errorMessage;
 
   bool get isTracking => status == TrackingStatus.tracking;
+
+  /// Total distance covered so far, in meters.
+  double get distanceMeters => _totalDistanceMeters;
 
   /// Total time spent tracking, excluding any paused duration.
   Duration get elapsed => _segmentStart == null
@@ -39,7 +54,7 @@ class TrackingController extends ChangeNotifier {
   /// Requests location access and, if granted, starts listening to the GPS
   /// stream and the elapsed timer. On failure, sets [status] to
   /// [TrackingStatus.error] and [errorMessage] with a user-facing reason.
-  Future<void> start() async {
+  Future<void> start({required ActivityType activityType}) async {
     if (status == TrackingStatus.tracking) return;
 
     final failure = await _locationService.requestAccess();
@@ -57,8 +72,12 @@ class TrackingController extends ChangeNotifier {
       return;
     }
 
+    _activityType = activityType;
+    _sessionStartedAt = DateTime.now();
     _accumulated = Duration.zero;
-    _segmentStart = DateTime.now();
+    _segmentStart = _sessionStartedAt;
+    _recordedPositions.clear();
+    _totalDistanceMeters = 0;
     isPaused = false;
     errorMessage = null;
     status = TrackingStatus.tracking;
@@ -66,7 +85,8 @@ class TrackingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Pauses the GPS stream and timer without losing elapsed time so far.
+  /// Pauses the GPS stream and timer without losing elapsed time or the
+  /// route recorded so far.
   void pause() {
     if (status != TrackingStatus.tracking || isPaused) return;
     _accumulated += DateTime.now().difference(_segmentStart!);
@@ -85,7 +105,8 @@ class TrackingController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Stops listening to the GPS stream and timer for good.
+  /// Stops listening to the GPS stream and timer, keeping recorded data for
+  /// [finish] to read.
   void stop() {
     if (!isPaused && _segmentStart != null) {
       _accumulated += DateTime.now().difference(_segmentStart!);
@@ -97,10 +118,54 @@ class TrackingController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Stops tracking and returns a snapshot of the recorded session, or
+  /// `null` if no GPS fix was ever received (nothing worth saving).
+  FinishedSession? finish() {
+    stop();
+    if (_recordedPositions.isEmpty || _sessionStartedAt == null) return null;
+
+    final totalSeconds = elapsed.inSeconds;
+    final distanceKm = _totalDistanceMeters / 1000;
+    final avgSpeedMps = totalSeconds > 0 ? _totalDistanceMeters / totalSeconds : 0.0;
+    final avgPaceSecondsPerKm = distanceKm > 0 ? totalSeconds / distanceKm : 0.0;
+    final hours = totalSeconds / 3600;
+    final calories = (_activityType!.met * _assumedWeightKg * hours).round();
+
+    return FinishedSession(
+      activityType: _activityType!,
+      startTime: _sessionStartedAt!,
+      endTime: DateTime.now(),
+      duration: Duration(seconds: totalSeconds),
+      distanceMeters: _totalDistanceMeters,
+      avgSpeedMps: avgSpeedMps,
+      avgPaceSecondsPerKm: avgPaceSecondsPerKm,
+      calories: calories,
+      positions: List.unmodifiable(_recordedPositions),
+    );
+  }
+
+  /// Stops tracking and discards all in-memory recording data. Use this when
+  /// the user cancels instead of finishing an activity.
+  void cancel() {
+    stop();
+    _recordedPositions.clear();
+    _totalDistanceMeters = 0;
+    _sessionStartedAt = null;
+  }
+
   void _startListening() {
     _positionSubscription = _locationService.watchPosition().listen(
       (position) {
+        if (currentPosition != null) {
+          _totalDistanceMeters += Geolocator.distanceBetween(
+            currentPosition!.latitude,
+            currentPosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+        }
         currentPosition = position;
+        _recordedPositions.add(position);
         notifyListeners();
       },
       onError: (Object error) {
