@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart' hide ActivityType;
 import '../../../core/format.dart';
 import '../../../models/activity_type.dart';
 import '../../../models/finished_session.dart';
+import '../../../services/kalman_location_filter.dart';
 import '../../../services/location_service.dart';
 import '../../../services/tracking_notification_service.dart';
 import '../../settings/controller/settings_controller.dart';
@@ -28,6 +29,7 @@ class TrackingController extends ChangeNotifier {
     : _locationService = locationService ?? LocationService();
 
   final LocationService _locationService;
+  final KalmanLocationFilter _kalmanFilter = KalmanLocationFilter();
 
   StreamSubscription<Position>? _positionSubscription;
   Timer? _ticker;
@@ -92,6 +94,7 @@ class TrackingController extends ChangeNotifier {
     _segmentStart = _sessionStartedAt;
     _recordedPositions.clear();
     _totalDistanceMeters = 0;
+    _kalmanFilter.reset();
     isPaused = false;
     errorMessage = null;
     status = TrackingStatus.tracking;
@@ -130,6 +133,7 @@ class TrackingController extends ChangeNotifier {
     }
     _stopListening();
     TrackingNotificationService.stop();
+    _kalmanFilter.reset();
     status = TrackingStatus.idle;
     isPaused = false;
     notifyListeners();
@@ -172,6 +176,7 @@ class TrackingController extends ChangeNotifier {
     _recordedPositions.clear();
     _totalDistanceMeters = 0;
     _sessionStartedAt = null;
+    _kalmanFilter.reset();
   }
 
   void _updateNotification() {
@@ -197,7 +202,10 @@ class TrackingController extends ChangeNotifier {
     _positionSubscription = _locationService
         .watchPosition(distanceFilter: _distanceFilter)
         .listen(
-          (position) {
+          (rawPosition) {
+            final position = _kalmanFilter.process(rawPosition);
+            if (position == null) return; // Outlier discarded
+
             if (currentPosition != null) {
               _totalDistanceMeters += Geolocator.distanceBetween(
                 currentPosition!.latitude,
