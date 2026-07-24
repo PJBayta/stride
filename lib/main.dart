@@ -6,11 +6,13 @@ import 'features/home/presentation/home_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
 import 'features/settings/controller/settings_controller.dart';
 import 'features/settings/presentation/settings_screen.dart';
+import 'services/tracking_notification_service.dart';
 import 'widgets/stride_navigation_scaffold.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await settingsController.load();
+  await TrackingNotificationService.init();
   runApp(const StrideApp());
 }
 

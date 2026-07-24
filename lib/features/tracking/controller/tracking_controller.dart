@@ -3,9 +3,12 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart' hide ActivityType;
 
+import '../../../core/format.dart';
 import '../../../models/activity_type.dart';
 import '../../../models/finished_session.dart';
 import '../../../services/location_service.dart';
+import '../../../services/tracking_notification_service.dart';
+import '../../settings/controller/settings_controller.dart';
 
 enum TrackingStatus { idle, tracking, error }
 
@@ -93,6 +96,8 @@ class TrackingController extends ChangeNotifier {
     errorMessage = null;
     status = TrackingStatus.tracking;
     _startListening();
+    TrackingNotificationService.start(activityType);
+    _updateNotification();
     notifyListeners();
   }
 
@@ -124,6 +129,7 @@ class TrackingController extends ChangeNotifier {
       _segmentStart = null;
     }
     _stopListening();
+    TrackingNotificationService.stop();
     status = TrackingStatus.idle;
     isPaused = false;
     notifyListeners();
@@ -168,6 +174,25 @@ class TrackingController extends ChangeNotifier {
     _sessionStartedAt = null;
   }
 
+  void _updateNotification() {
+    if (_activityType == null) return;
+    final units = settingsController.measurementUnit;
+    final distVal = units.distanceFromMeters(_totalDistanceMeters);
+    final distText = '${distVal.toStringAsFixed(2)} ${units.distanceLabel}';
+    final durText = formatDuration(elapsed);
+
+    final speedMps = currentPosition?.speed ?? 0.0;
+    final speedVal = units.speedFromMetersPerSecond(speedMps);
+    final speedText = '${speedVal.toStringAsFixed(1)} ${units.speedLabel}';
+
+    TrackingNotificationService.update(
+      activityType: _activityType!,
+      durationText: durText,
+      distanceText: distText,
+      speedOrPaceText: speedText,
+    );
+  }
+
   void _startListening() {
     _positionSubscription = _locationService
         .watchPosition(distanceFilter: _distanceFilter)
@@ -183,6 +208,7 @@ class TrackingController extends ChangeNotifier {
             }
             currentPosition = position;
             _recordedPositions.add(position);
+            _updateNotification();
             notifyListeners();
           },
           onError: (Object error) {
@@ -192,7 +218,10 @@ class TrackingController extends ChangeNotifier {
         );
     _ticker = Timer.periodic(
       const Duration(seconds: 1),
-      (_) => notifyListeners(),
+      (_) {
+        _updateNotification();
+        notifyListeners();
+      },
     );
   }
 
