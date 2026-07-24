@@ -44,6 +44,9 @@ class TrackingController extends ChangeNotifier {
 
   bool get isTracking => status == TrackingStatus.tracking;
 
+  /// The active activity type being tracked, or null if idle.
+  ActivityType? get activityType => _activityType;
+
   /// Total distance covered so far, in meters.
   double get distanceMeters => _totalDistanceMeters;
 
@@ -206,3 +209,10 @@ class TrackingController extends ChangeNotifier {
     super.dispose();
   }
 }
+
+TrackingController? _trackingControllerInstance;
+
+/// The single [TrackingController] instance used by the app.
+TrackingController get trackingController =>
+    _trackingControllerInstance ??= TrackingController();
+

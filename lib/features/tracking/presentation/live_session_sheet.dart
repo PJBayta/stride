@@ -31,28 +31,56 @@ class LiveSessionSheet extends StatefulWidget {
 }
 
 class _LiveSessionSheetState extends State<LiveSessionSheet> {
-  late final TrackingController _controller;
+  TrackingController get _controller => trackingController;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = TrackingController()
-      ..start(
+    if (!_controller.isTracking) {
+      _controller.start(
         activityType: widget.activityType,
         distanceFilter: settingsController.gpsAccuracy.distanceFilter,
       );
+    }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _cancel() {
-    _controller.cancel();
+  void _minimize() {
     Navigator.of(context).pop();
+  }
+
+  Future<void> _confirmDiscard() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Discard Activity?'),
+        content: const Text(
+          'Are you sure you want to discard this activity? All tracked data for this session will be lost.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('CANCEL'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('DISCARD'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _controller.cancel();
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Activity discarded.')),
+      );
+    }
   }
 
   Future<void> _finish() async {
@@ -95,9 +123,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: _isSaving ? null : _cancel,
+                        onPressed: _isSaving ? null : _minimize,
                         icon: const Icon(Icons.keyboard_arrow_down),
-                        tooltip: 'Cancel live session',
+                        tooltip: 'Minimize live session',
                       ),
                       Expanded(
                         child: Text(
@@ -108,7 +136,16 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      TextButton(
+                        onPressed: _isSaving ? null : _confirmDiscard,
+                        child: Text(
+                          'Discard',
+                          style: textTheme.labelLarge?.copyWith(
+                            color: colorScheme.error,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

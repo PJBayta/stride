@@ -4,6 +4,7 @@ import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
+import '../../tracking/controller/tracking_controller.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
 
@@ -19,6 +20,26 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   ActivityType _selectedActivity = ActivityType.run;
 
+  void _openLiveSessionSheet(BuildContext homeContext, ActivityType type) {
+    showModalBottomSheet<void>(
+      context: homeContext,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: 0.92,
+        child: LiveSessionSheet(
+          activityType: type,
+          onFinished: (activity) => _showSessionSummary(
+            homeContext,
+            sheetContext,
+            activity,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -27,84 +48,80 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Home'), centerTitle: true),
       body: ListenableBuilder(
-        listenable: settingsController,
-        builder: (context, _) => SafeArea(
-          top: false,
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            children: [
-              Text(
-                'STRIDE ACTIVE',
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
+        listenable: Listenable.merge([settingsController, trackingController]),
+        builder: (context, _) {
+          final isTracking = trackingController.isTracking;
+          final activeActivity = trackingController.activityType ?? _selectedActivity;
+
+          return SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              children: [
+                Text(
+                  'STRIDE ACTIVE',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Good Morning!',
-                style: textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                const SizedBox(height: 4),
+                Text(
+                  getDynamicGreeting(),
+                  style: textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 28),
-              Text(
-                'SELECT ACTIVITY',
-                style: textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.8,
+                const SizedBox(height: 28),
+                Text(
+                  isTracking ? 'ACTIVITY IN PROGRESS' : 'SELECT ACTIVITY',
+                  style: textTheme.labelMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.8,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: ActivityType.values
-                    .map(
-                      (activity) => Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: activity == ActivityType.bike ? 0 : 10,
-                          ),
-                          child: _ActivitySelector(
-                            activity: activity,
-                            isSelected: activity == _selectedActivity,
-                            onTap: () =>
-                                setState(() => _selectedActivity = activity),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 52,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      useSafeArea: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (sheetContext) => FractionallySizedBox(
-                        heightFactor: 0.92,
-                        child: LiveSessionSheet(
-                          activityType: _selectedActivity,
-                          onFinished: (activity) => _showSessionSummary(
-                            context,
-                            sheetContext,
-                            activity,
+                const SizedBox(height: 10),
+                Row(
+                  children: ActivityType.values
+                      .map(
+                        (activity) => Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: activity == ActivityType.bike ? 0 : 10,
+                            ),
+                            child: _ActivitySelector(
+                              activity: activity,
+                              isSelected: activity == (isTracking ? activeActivity : _selectedActivity),
+                              onTap: isTracking
+                                  ? () => _openLiveSessionSheet(context, activeActivity)
+                                  : () => setState(() => _selectedActivity = activity),
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('START ACTIVITY'),
+                      )
+                      .toList(),
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 52,
+                  child: FilledButton.icon(
+                    onPressed: () => _openLiveSessionSheet(
+                      context,
+                      isTracking ? activeActivity : _selectedActivity,
+                    ),
+                    icon: Icon(
+                      isTracking
+                          ? Icons.directions_run_rounded
+                          : Icons.play_arrow_rounded,
+                    ),
+                    label: Text(
+                      isTracking ? 'ACTIVITY IN PROGRESS' : 'START ACTIVITY',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -156,9 +173,26 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-        ),
-      ),
-    );
+        );
+      },
+    ),
+  );
+  }
+
+  String getDynamicGreeting() {
+    final hour = DateTime.now().hour;
+
+    if (hour >= 2 && hour < 5){
+      return "The world sleeps, but you’re ahead.";
+    } else if (hour >= 5 && hour < 12) {
+      return "Good Morning!";
+    } else if (hour >= 12 && hour < 17) {
+      return "Good Afternoon!";
+    } else if (hour >= 17 && hour < 21) {
+      return "Good Evening!";
+    } else {
+      return "Rest fuels tomorrow’s grind.";
+    }
   }
 
   void _showSessionSummary(
