@@ -26,16 +26,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forExecutor(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        beforeOpen: (details) async {
-          // SQLite doesn't enforce foreign keys per-connection unless asked;
-          // without this, GpsPoints' onDelete: KeyAction.cascade is a no-op.
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(activities, activities.steps);
+      }
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 }
 
 QueryExecutor _openConnection() {

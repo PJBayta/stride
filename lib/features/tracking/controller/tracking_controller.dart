@@ -6,8 +6,10 @@ import 'package:geolocator/geolocator.dart' hide ActivityType;
 import '../../../core/format.dart';
 import '../../../models/activity_type.dart';
 import '../../../models/finished_session.dart';
+import '../../../models/measurement_unit.dart';
 import '../../../services/kalman_location_filter.dart';
 import '../../../services/location_service.dart';
+import '../../../services/step_counter_service.dart';
 import '../../../services/tracking_notification_service.dart';
 import '../../settings/controller/settings_controller.dart';
 
@@ -30,6 +32,7 @@ class TrackingController extends ChangeNotifier {
 
   final LocationService _locationService;
   final KalmanLocationFilter _kalmanFilter = KalmanLocationFilter();
+  final StepCounterService _stepCounterService = StepCounterService();
 
   StreamSubscription<Position>? _positionSubscription;
   Timer? _ticker;
@@ -98,6 +101,7 @@ class TrackingController extends ChangeNotifier {
     isPaused = false;
     errorMessage = null;
     status = TrackingStatus.tracking;
+    _stepCounterService.startListening();
     _startListening();
     TrackingNotificationService.start(activityType);
     _updateNotification();
@@ -142,19 +146,22 @@ class TrackingController extends ChangeNotifier {
   /// Stops tracking and returns a snapshot of the recorded session, or
   /// `null` if no GPS fix was ever received (nothing worth saving).
   FinishedSession? finish() {
+    final int steps = _stepCounterService.stopAndCalculateSteps(
+      totalDistanceMeters: _totalDistanceMeters,
+    );
     stop();
     if (_recordedPositions.isEmpty || _sessionStartedAt == null) return null;
 
-    final totalSeconds = elapsed.inSeconds;
-    final distanceKm = _totalDistanceMeters / 1000;
-    final avgSpeedMps = totalSeconds > 0
-        ? _totalDistanceMeters / totalSeconds
+    final int totalSeconds = elapsed.inSeconds;
+    final double distanceKm = _totalDistanceMeters / 1000.0;
+    final double avgSpeedMps = totalSeconds > 0
+        ? _totalDistanceMeters / totalSeconds.toDouble()
         : 0.0;
-    final avgPaceSecondsPerKm = distanceKm > 0
-        ? totalSeconds / distanceKm
+    final double avgPaceSecondsPerKm = distanceKm > 0
+        ? totalSeconds.toDouble() / distanceKm
         : 0.0;
-    final hours = totalSeconds / 3600;
-    final calories = (_activityType!.met * _assumedWeightKg * hours).round();
+    final double hours = totalSeconds / 3600.0;
+    final int calories = (_activityType!.met * _assumedWeightKg * hours).round();
 
     return FinishedSession(
       activityType: _activityType!,
@@ -165,6 +172,7 @@ class TrackingController extends ChangeNotifier {
       avgSpeedMps: avgSpeedMps,
       avgPaceSecondsPerKm: avgPaceSecondsPerKm,
       calories: calories,
+      steps: steps,
       positions: List.unmodifiable(_recordedPositions),
     );
   }
@@ -172,6 +180,7 @@ class TrackingController extends ChangeNotifier {
   /// Stops tracking and discards all in-memory recording data. Use this when
   /// the user cancels instead of finishing an activity.
   void cancel() {
+    _stepCounterService.stopAndCalculateSteps(totalDistanceMeters: 0);
     stop();
     _recordedPositions.clear();
     _totalDistanceMeters = 0;
@@ -181,14 +190,14 @@ class TrackingController extends ChangeNotifier {
 
   void _updateNotification() {
     if (_activityType == null) return;
-    final units = settingsController.measurementUnit;
-    final distVal = units.distanceFromMeters(_totalDistanceMeters);
-    final distText = '${distVal.toStringAsFixed(2)} ${units.distanceLabel}';
-    final durText = formatDuration(elapsed);
+    final MeasurementUnit units = settingsController.measurementUnit;
+    final double distVal = units.distanceFromMeters(_totalDistanceMeters);
+    final String distText = '${distVal.toStringAsFixed(2)} ${units.distanceLabel}';
+    final String durText = formatDuration(elapsed);
 
-    final speedMps = currentPosition?.speed ?? 0.0;
-    final speedVal = units.speedFromMetersPerSecond(speedMps);
-    final speedText = '${speedVal.toStringAsFixed(1)} ${units.speedLabel}';
+    final double speedMps = currentPosition?.speed ?? 0.0;
+    final double speedVal = units.speedFromMetersPerSecond(speedMps);
+    final String speedText = '${speedVal.toStringAsFixed(1)} ${units.speedLabel}';
 
     TrackingNotificationService.update(
       activityType: _activityType!,
@@ -252,4 +261,3 @@ TrackingController? _trackingControllerInstance;
 /// The single [TrackingController] instance used by the app.
 TrackingController get trackingController =>
     _trackingControllerInstance ??= TrackingController();
-

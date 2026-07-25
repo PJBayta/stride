@@ -171,6 +171,14 @@ class SessionSummarySheet extends StatelessWidget {
                     unit: '',
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SummaryMetric(
+                    label: 'STEPS',
+                    value: activity.steps.toString(),
+                    unit: 'STEPS',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -279,12 +287,13 @@ class _SummaryMetric extends StatelessWidget {
                 ),
                 children: [
                   TextSpan(text: value),
-                  TextSpan(
-                    text: ' $unit',
-                    style: text.labelSmall?.copyWith(
-                      color: colors.onSurfaceVariant,
+                  if (unit.isNotEmpty)
+                    TextSpan(
+                      text: ' $unit',
+                      style: text.labelSmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),

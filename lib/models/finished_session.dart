@@ -17,6 +17,7 @@ class FinishedSession {
     required this.avgSpeedMps,
     required this.avgPaceSecondsPerKm,
     required this.calories,
+    required this.steps,
     required this.positions,
   });
 
@@ -28,5 +29,6 @@ class FinishedSession {
   final double avgSpeedMps;
   final double avgPaceSecondsPerKm;
   final int calories;
+  final int steps;
   final List<Position> positions;
 }

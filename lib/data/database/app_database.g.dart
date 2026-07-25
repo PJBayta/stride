@@ -22,6 +22,16 @@ class $ActivitiesTable extends Activities
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _stepsMeta = const VerificationMeta('steps');
+  @override
+  late final GeneratedColumn<int> steps = GeneratedColumn<int>(
+    'steps',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _activityTypeMeta = const VerificationMeta(
     'activityType',
   );
@@ -129,6 +139,7 @@ class $ActivitiesTable extends Activities
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    steps,
     activityType,
     startTime,
     endTime,
@@ -153,6 +164,12 @@ class $ActivitiesTable extends Activities
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('steps')) {
+      context.handle(
+        _stepsMeta,
+        steps.isAcceptableOrUnknown(data['steps']!, _stepsMeta),
+      );
     }
     if (data.containsKey('activity_type')) {
       context.handle(
@@ -246,6 +263,10 @@ class $ActivitiesTable extends Activities
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      steps: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}steps'],
+      )!,
       activityType: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}activity_type'],
@@ -295,7 +316,10 @@ class Activity extends DataClass implements Insertable<Activity> {
   /// Primary key. Maps to `ActivityID`.
   final int id;
 
-  /// The kind of activity, e.g. `run`, `walk`, `ride`.
+  /// Step count
+  final int steps;
+
+  /// `run`, `walk`, `ride`.
   final String activityType;
 
   /// When the activity started.
@@ -323,6 +347,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   final DateTime createdAt;
   const Activity({
     required this.id,
+    required this.steps,
     required this.activityType,
     required this.startTime,
     required this.endTime,
@@ -337,6 +362,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    map['steps'] = Variable<int>(steps);
     map['activity_type'] = Variable<String>(activityType);
     map['start_time'] = Variable<DateTime>(startTime);
     map['end_time'] = Variable<DateTime>(endTime);
@@ -352,6 +378,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   ActivitiesCompanion toCompanion(bool nullToAbsent) {
     return ActivitiesCompanion(
       id: Value(id),
+      steps: Value(steps),
       activityType: Value(activityType),
       startTime: Value(startTime),
       endTime: Value(endTime),
@@ -371,6 +398,7 @@ class Activity extends DataClass implements Insertable<Activity> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Activity(
       id: serializer.fromJson<int>(json['id']),
+      steps: serializer.fromJson<int>(json['steps']),
       activityType: serializer.fromJson<String>(json['activityType']),
       startTime: serializer.fromJson<DateTime>(json['startTime']),
       endTime: serializer.fromJson<DateTime>(json['endTime']),
@@ -387,6 +415,7 @@ class Activity extends DataClass implements Insertable<Activity> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'steps': serializer.toJson<int>(steps),
       'activityType': serializer.toJson<String>(activityType),
       'startTime': serializer.toJson<DateTime>(startTime),
       'endTime': serializer.toJson<DateTime>(endTime),
@@ -401,6 +430,7 @@ class Activity extends DataClass implements Insertable<Activity> {
 
   Activity copyWith({
     int? id,
+    int? steps,
     String? activityType,
     DateTime? startTime,
     DateTime? endTime,
@@ -412,6 +442,7 @@ class Activity extends DataClass implements Insertable<Activity> {
     DateTime? createdAt,
   }) => Activity(
     id: id ?? this.id,
+    steps: steps ?? this.steps,
     activityType: activityType ?? this.activityType,
     startTime: startTime ?? this.startTime,
     endTime: endTime ?? this.endTime,
@@ -425,6 +456,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   Activity copyWithCompanion(ActivitiesCompanion data) {
     return Activity(
       id: data.id.present ? data.id.value : this.id,
+      steps: data.steps.present ? data.steps.value : this.steps,
       activityType: data.activityType.present
           ? data.activityType.value
           : this.activityType,
@@ -447,6 +479,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   String toString() {
     return (StringBuffer('Activity(')
           ..write('id: $id, ')
+          ..write('steps: $steps, ')
           ..write('activityType: $activityType, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
@@ -463,6 +496,7 @@ class Activity extends DataClass implements Insertable<Activity> {
   @override
   int get hashCode => Object.hash(
     id,
+    steps,
     activityType,
     startTime,
     endTime,
@@ -478,6 +512,7 @@ class Activity extends DataClass implements Insertable<Activity> {
       identical(this, other) ||
       (other is Activity &&
           other.id == this.id &&
+          other.steps == this.steps &&
           other.activityType == this.activityType &&
           other.startTime == this.startTime &&
           other.endTime == this.endTime &&
@@ -491,6 +526,7 @@ class Activity extends DataClass implements Insertable<Activity> {
 
 class ActivitiesCompanion extends UpdateCompanion<Activity> {
   final Value<int> id;
+  final Value<int> steps;
   final Value<String> activityType;
   final Value<DateTime> startTime;
   final Value<DateTime> endTime;
@@ -502,6 +538,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
   final Value<DateTime> createdAt;
   const ActivitiesCompanion({
     this.id = const Value.absent(),
+    this.steps = const Value.absent(),
     this.activityType = const Value.absent(),
     this.startTime = const Value.absent(),
     this.endTime = const Value.absent(),
@@ -514,6 +551,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
   });
   ActivitiesCompanion.insert({
     this.id = const Value.absent(),
+    this.steps = const Value.absent(),
     required String activityType,
     required DateTime startTime,
     required DateTime endTime,
@@ -533,6 +571,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
        calories = Value(calories);
   static Insertable<Activity> custom({
     Expression<int>? id,
+    Expression<int>? steps,
     Expression<String>? activityType,
     Expression<DateTime>? startTime,
     Expression<DateTime>? endTime,
@@ -545,6 +584,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (steps != null) 'steps': steps,
       if (activityType != null) 'activity_type': activityType,
       if (startTime != null) 'start_time': startTime,
       if (endTime != null) 'end_time': endTime,
@@ -559,6 +599,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
 
   ActivitiesCompanion copyWith({
     Value<int>? id,
+    Value<int>? steps,
     Value<String>? activityType,
     Value<DateTime>? startTime,
     Value<DateTime>? endTime,
@@ -571,6 +612,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
   }) {
     return ActivitiesCompanion(
       id: id ?? this.id,
+      steps: steps ?? this.steps,
       activityType: activityType ?? this.activityType,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
@@ -588,6 +630,9 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (steps.present) {
+      map['steps'] = Variable<int>(steps.value);
     }
     if (activityType.present) {
       map['activity_type'] = Variable<String>(activityType.value);
@@ -623,6 +668,7 @@ class ActivitiesCompanion extends UpdateCompanion<Activity> {
   String toString() {
     return (StringBuffer('ActivitiesCompanion(')
           ..write('id: $id, ')
+          ..write('steps: $steps, ')
           ..write('activityType: $activityType, ')
           ..write('startTime: $startTime, ')
           ..write('endTime: $endTime, ')
@@ -1305,6 +1351,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$ActivitiesTableCreateCompanionBuilder =
     ActivitiesCompanion Function({
       Value<int> id,
+      Value<int> steps,
       required String activityType,
       required DateTime startTime,
       required DateTime endTime,
@@ -1318,6 +1365,7 @@ typedef $$ActivitiesTableCreateCompanionBuilder =
 typedef $$ActivitiesTableUpdateCompanionBuilder =
     ActivitiesCompanion Function({
       Value<int> id,
+      Value<int> steps,
       Value<String> activityType,
       Value<DateTime> startTime,
       Value<DateTime> endTime,
@@ -1363,6 +1411,11 @@ class $$ActivitiesTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get steps => $composableBuilder(
+    column: $table.steps,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1451,6 +1504,11 @@ class $$ActivitiesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get steps => $composableBuilder(
+    column: $table.steps,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get activityType => $composableBuilder(
     column: $table.activityType,
     builder: (column) => ColumnOrderings(column),
@@ -1508,6 +1566,9 @@ class $$ActivitiesTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get steps =>
+      $composableBuilder(column: $table.steps, builder: (column) => column);
 
   GeneratedColumn<String> get activityType => $composableBuilder(
     column: $table.activityType,
@@ -1597,6 +1658,7 @@ class $$ActivitiesTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int> steps = const Value.absent(),
                 Value<String> activityType = const Value.absent(),
                 Value<DateTime> startTime = const Value.absent(),
                 Value<DateTime> endTime = const Value.absent(),
@@ -1608,6 +1670,7 @@ class $$ActivitiesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
               }) => ActivitiesCompanion(
                 id: id,
+                steps: steps,
                 activityType: activityType,
                 startTime: startTime,
                 endTime: endTime,
@@ -1621,6 +1684,7 @@ class $$ActivitiesTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int> steps = const Value.absent(),
                 required String activityType,
                 required DateTime startTime,
                 required DateTime endTime,
@@ -1632,6 +1696,7 @@ class $$ActivitiesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
               }) => ActivitiesCompanion.insert(
                 id: id,
+                steps: steps,
                 activityType: activityType,
                 startTime: startTime,
                 endTime: endTime,

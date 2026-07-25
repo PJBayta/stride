@@ -4,6 +4,9 @@ class Activities extends Table {
   /// Primary key. Maps to `ActivityID`.
   IntColumn get id => integer().autoIncrement()();
 
+  /// Step count
+  IntColumn get steps => integer().withDefault(const Constant(0))();
+
   /// `run`, `walk`, `ride`.
   TextColumn get activityType => text().withLength(min: 1, max: 50)();
 

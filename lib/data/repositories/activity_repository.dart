@@ -18,6 +18,7 @@ class ActivityRepository {
     return _database.transaction(() async {
       final activityId = await _database.activitiesDao.insertActivity(
         ActivitiesCompanion.insert(
+          steps: Value(session.steps),
           activityType: session.activityType.dbValue,
           startTime: session.startTime,
           endTime: session.endTime,
