@@ -26,7 +26,7 @@ Unlike Strava, Stride intentionally excludes social networking features, allowin
 The first version of Stride includes:
 
 - 🏠 Home
-- 🏃 Activity Tracking (GPS, timer, distance, speed, pace)
+- 🏃 Activity Tracking (GPS, timer, distance, speed, pace, step count)
 - 📊 Activity Summary
 - 📜 Activity History
 - 👤 Profile Statistics
