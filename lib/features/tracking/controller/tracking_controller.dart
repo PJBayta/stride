@@ -101,7 +101,11 @@ class TrackingController extends ChangeNotifier {
     isPaused = false;
     errorMessage = null;
     status = TrackingStatus.tracking;
-    _stepCounterService.startListening();
+    // Only count steps for foot-based activities (run, walk).
+    // Bike sessions produce no footsteps, so we skip the sensor entirely.
+    if (_activityType != ActivityType.bike) {
+      _stepCounterService.startListening();
+    }
     _startListening();
     TrackingNotificationService.start(activityType);
     _updateNotification();
@@ -146,9 +150,12 @@ class TrackingController extends ChangeNotifier {
   /// Stops tracking and returns a snapshot of the recorded session, or
   /// `null` if no GPS fix was ever received (nothing worth saving).
   FinishedSession? finish() {
-    final int steps = _stepCounterService.stopAndCalculateSteps(
-      totalDistanceMeters: _totalDistanceMeters,
-    );
+    // Bike activities don't involve footsteps — return 0 and skip sensor.
+    final int steps = _activityType == ActivityType.bike
+        ? 0
+        : _stepCounterService.stopAndCalculateSteps(
+            totalDistanceMeters: _totalDistanceMeters,
+          );
     stop();
     if (_recordedPositions.isEmpty || _sessionStartedAt == null) return null;
 
@@ -180,7 +187,9 @@ class TrackingController extends ChangeNotifier {
   /// Stops tracking and discards all in-memory recording data. Use this when
   /// the user cancels instead of finishing an activity.
   void cancel() {
-    _stepCounterService.stopAndCalculateSteps(totalDistanceMeters: 0);
+    if (_activityType != ActivityType.bike) {
+      _stepCounterService.stopAndCalculateSteps(totalDistanceMeters: 0);
+    }
     stop();
     _recordedPositions.clear();
     _totalDistanceMeters = 0;

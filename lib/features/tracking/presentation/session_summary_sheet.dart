@@ -171,14 +171,18 @@ class SessionSummarySheet extends StatelessWidget {
                     unit: '',
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SummaryMetric(
-                    label: 'STEPS',
-                    value: activity.steps.toString(),
-                    unit: 'STEPS',
+                // Steps are only meaningful for foot-based activities.
+                // Bike sessions always store 0, so we hide the card entirely.
+                if (type != ActivityType.bike) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _SummaryMetric(
+                      label: 'STEPS',
+                      value: activity.steps.toString(),
+                      unit: 'STEPS',
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
             const SizedBox(height: 12),
