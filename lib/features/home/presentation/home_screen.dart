@@ -8,6 +8,9 @@ import '../../tracking/controller/tracking_controller.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
 
+import '../../../data/repositories/activity_repository.dart';
+import '../../../models/finished_session.dart';
+
 const _recentActivitiesLimit = 3;
 
 class HomeScreen extends StatefulWidget {
@@ -30,10 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
         heightFactor: 0.92,
         child: LiveSessionSheet(
           activityType: type,
-          onFinished: (activity) => _showSessionSummary(
+          onFinished: (session) => _showSessionSummary(
             homeContext,
             sheetContext,
-            activity,
+            session,
           ),
         ),
       ),
@@ -198,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showSessionSummary(
     BuildContext homeContext,
     BuildContext sheetContext,
-    Activity activity,
+    FinishedSession session,
   ) {
     Navigator.of(sheetContext).pop();
     showModalBottomSheet<void>(
@@ -208,18 +211,18 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (summaryContext) => FractionallySizedBox(
         heightFactor: 0.92,
-        child: SessionSummarySheet(
-          activity: activity,
-          onSave: () {
+        child: SessionSummarySheet.fromFinishedSession(
+          session: session,
+          onSave: () async {
+            await ActivityRepository(appDatabase).saveSession(session);
+            if (!summaryContext.mounted) return;
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(
               homeContext,
             ).showSnackBar(const SnackBar(content: Text('Activity saved.')));
           },
           onHome: () => Navigator.of(summaryContext).pop(),
-          onDiscard: () async {
-            await appDatabase.activitiesDao.deleteActivity(activity.id);
-            if (!summaryContext.mounted) return;
+          onDiscard: () {
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(homeContext).showSnackBar(
               const SnackBar(content: Text('Activity discarded.')),

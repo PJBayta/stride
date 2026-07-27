@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' as latlong;
 
 import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../../features/settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
+import '../../../models/finished_session.dart';
 import 'route_map_view.dart';
 
 /// Shows [SessionSummarySheet] for an already-saved activity, e.g. when
@@ -18,7 +20,7 @@ Future<void> showActivitySummarySheet(BuildContext context, Activity activity) {
     backgroundColor: Colors.transparent,
     builder: (sheetContext) => FractionallySizedBox(
       heightFactor: 0.92,
-      child: SessionSummarySheet(
+      child: SessionSummarySheet.fromActivity(
         activity: activity,
         onSave: () => Navigator.of(sheetContext).pop(),
         onHome: () => Navigator.of(sheetContext).pop(),
@@ -35,21 +37,56 @@ Future<void> showActivitySummarySheet(BuildContext context, Activity activity) {
   );
 }
 
-/// Session summary shown after a live session is finished and saved.
+/// Session summary shown after a tracking session is completed.
 ///
-/// The activity is already persisted by the time this sheet is shown (saving
-/// happens on Finish); "Save" here just confirms and closes, while "Discard"
-/// deletes the just-saved row (its GPS points cascade-delete with it).
+/// Can represent either an in-memory [FinishedSession] (before user confirms Save)
+/// or an already persisted [Activity].
 class SessionSummarySheet extends StatelessWidget {
-  const SessionSummarySheet({
+  SessionSummarySheet.fromFinishedSession({
     super.key,
-    required this.activity,
+    required FinishedSession session,
     required this.onSave,
     required this.onHome,
     required this.onDiscard,
-  });
+  })  : activityType = session.activityType,
+        startTime = session.startTime,
+        durationSeconds = session.duration.inSeconds,
+        distanceMeters = session.distanceMeters,
+        avgSpeed = session.avgSpeedMps,
+        avgPace = session.avgPaceSecondsPerKm,
+        calories = session.calories,
+        steps = session.steps,
+        savedActivityId = null,
+        positions = session.positions;
 
-  final Activity activity;
+  SessionSummarySheet.fromActivity({
+    super.key,
+    required Activity activity,
+    required this.onSave,
+    required this.onHome,
+    required this.onDiscard,
+  })  : activityType = ActivityType.fromDbValue(activity.activityType),
+        startTime = activity.startTime,
+        durationSeconds = activity.durationSeconds,
+        distanceMeters = activity.distanceMeters,
+        avgSpeed = activity.avgSpeed,
+        avgPace = activity.avgPace,
+        calories = activity.calories,
+        steps = activity.steps,
+        savedActivityId = activity.id,
+        positions = null;
+
+  final ActivityType activityType;
+  final DateTime startTime;
+  final int durationSeconds;
+  final double distanceMeters;
+  final double avgSpeed;
+  final double avgPace;
+  final int calories;
+  final int steps;
+  final int? savedActivityId;
+  final List<dynamic>? positions;
+
   final VoidCallback onSave;
   final VoidCallback onHome;
   final VoidCallback onDiscard;
@@ -58,11 +95,10 @@ class SessionSummarySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
-    final type = ActivityType.fromDbValue(activity.activityType);
     final units = settingsController.measurementUnit;
-    final distance = units.distanceFromMeters(activity.distanceMeters);
-    final speed = units.speedFromMetersPerSecond(activity.avgSpeed);
-    final pace = units.paceFromSecondsPerKm(activity.avgPace);
+    final distance = units.distanceFromMeters(distanceMeters);
+    final speed = units.speedFromMetersPerSecond(avgSpeed);
+    final pace = units.paceFromSecondsPerKm(avgPace);
 
     return Material(
       color: colors.surface,
@@ -99,7 +135,7 @@ class SessionSummarySheet extends StatelessWidget {
                     color: colors.primary,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(type.icon, color: colors.onPrimary),
+                  child: Icon(activityType.icon, color: colors.onPrimary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -107,13 +143,13 @@ class SessionSummarySheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${type.label} Session',
+                        '${activityType.label} Session',
                         style: text.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        formatSessionTimestamp(activity.startTime),
+                        formatSessionTimestamp(startTime),
                         style: text.labelMedium?.copyWith(
                           color: colors.onSurfaceVariant,
                         ),
@@ -141,16 +177,26 @@ class SessionSummarySheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 18),
-            FutureBuilder<List<GpsPoint>>(
-              future: appDatabase.gpsPointsDao.getPointsForActivity(
-                activity.id,
-              ),
-              builder: (context, snapshot) {
-                return RouteMapView(
-                  points: snapshot.data ?? const <GpsPoint>[],
-                );
-              },
-            ),
+            if (positions != null)
+              RouteMapView.fromCoordinates(
+                coordinates: [
+                  for (final p in positions!)
+                    latlong.LatLng(p.latitude as double, p.longitude as double),
+                ],
+              )
+            else if (savedActivityId != null)
+              FutureBuilder<List<GpsPoint>>(
+                future: appDatabase.gpsPointsDao.getPointsForActivity(
+                  savedActivityId!,
+                ),
+                builder: (context, snapshot) {
+                  return RouteMapView(
+                    points: snapshot.data ?? const <GpsPoint>[],
+                  );
+                },
+              )
+            else
+              const RouteMapView.fromCoordinates(coordinates: []),
             const SizedBox(height: 18),
             Row(
               children: [
@@ -166,19 +212,19 @@ class SessionSummarySheet extends StatelessWidget {
                   child: _SummaryMetric(
                     label: 'DURATION',
                     value: formatDuration(
-                      Duration(seconds: activity.durationSeconds),
+                      Duration(seconds: durationSeconds),
                     ),
                     unit: '',
                   ),
                 ),
                 // Steps are only meaningful for foot-based activities.
                 // Bike sessions always store 0, so we hide the card entirely.
-                if (type != ActivityType.bike) ...[
+                if (activityType != ActivityType.bike) ...[
                   const SizedBox(width: 12),
                   Expanded(
                     child: _SummaryMetric(
                       label: 'STEPS',
-                      value: activity.steps.toString(),
+                      value: steps.toString(),
                       unit: 'STEPS',
                     ),
                   ),
@@ -207,7 +253,7 @@ class SessionSummarySheet extends StatelessWidget {
                 Expanded(
                   child: _SummaryMetric(
                     label: 'CALORIES',
-                    value: activity.calories.toString(),
+                    value: calories.toString(),
                     unit: 'KCAL',
                   ),
                 ),

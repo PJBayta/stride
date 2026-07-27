@@ -18,9 +18,14 @@ import '../../../services/tile_cache_service.dart';
 /// draw a route (e.g. a very short or GPS-less session). This widget never
 /// live-updates — it's for reviewing a finished route, not tracking.
 class RouteMapView extends StatefulWidget {
-  const RouteMapView({super.key, required this.points});
+  const RouteMapView({super.key, required this.points})
+      : coordinates = null;
 
-  final List<GpsPoint> points;
+  const RouteMapView.fromCoordinates({super.key, required this.coordinates})
+      : points = null;
+
+  final List<GpsPoint>? points;
+  final List<latlong.LatLng>? coordinates;
 
   @override
   State<RouteMapView> createState() => _RouteMapViewState();
@@ -43,14 +48,15 @@ class _RouteMapViewState extends State<RouteMapView> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.points.length < 2) {
-      return _RouteMapPlaceholder(hasSinglePoint: widget.points.isNotEmpty);
-    }
-
-    final coordinates = [
-      for (final point in widget.points)
+    final coordinates = widget.coordinates ?? [
+      for (final point in (widget.points ?? const <GpsPoint>[]))
         latlong.LatLng(point.latitude, point.longitude),
     ];
+
+    if (coordinates.length < 2) {
+      return _RouteMapPlaceholder(hasSinglePoint: coordinates.isNotEmpty);
+    }
+
     final colorScheme = Theme.of(context).colorScheme;
 
     return ClipRRect(

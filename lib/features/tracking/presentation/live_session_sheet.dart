@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/format.dart';
-import '../../../data/database/app_database.dart';
-import '../../../data/repositories/activity_repository.dart';
 import '../../../features/settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
+import '../../../models/finished_session.dart';
 import '../controller/tracking_controller.dart';
 
 /// Live-session presentation shown while an activity is being tracked.
 ///
-/// Map/route rendering is not implemented yet; the map area remains a
-/// visual placeholder. GPS points are recorded in memory and, on Finish,
-/// saved through [ActivityRepository].
+/// GPS points are recorded in memory. On Finish, an in-memory [FinishedSession]
+/// is passed to [onFinished] without saving to the database. The user can then
+/// review the summary and decide whether to Save or Discard.
 class LiveSessionSheet extends StatefulWidget {
   const LiveSessionSheet({
     super.key,
@@ -21,10 +20,9 @@ class LiveSessionSheet extends StatefulWidget {
 
   final ActivityType activityType;
 
-  /// Called with the persisted [Activity] once a finished session has been
-  /// saved. Not called if the user cancels or if no GPS fix was ever
-  /// received.
-  final ValueChanged<Activity> onFinished;
+  /// Called with the in-memory [FinishedSession] when tracking is finished.
+  /// Not called if the user cancels or if no GPS fix was ever received.
+  final ValueChanged<FinishedSession> onFinished;
 
   @override
   State<LiveSessionSheet> createState() => _LiveSessionSheetState();
@@ -32,7 +30,6 @@ class LiveSessionSheet extends StatefulWidget {
 
 class _LiveSessionSheetState extends State<LiveSessionSheet> {
   TrackingController get _controller => trackingController;
-  bool _isSaving = false;
 
   @override
   void initState() {
@@ -83,8 +80,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
     }
   }
 
-  Future<void> _finish() async {
-    if (_isSaving) return;
+  void _finish() {
     final session = _controller.finish();
     if (session == null) {
       if (!mounted) return;
@@ -95,10 +91,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
       return;
     }
 
-    setState(() => _isSaving = true);
-    final saved = await ActivityRepository(appDatabase).saveSession(session);
-    if (!mounted) return;
-    widget.onFinished(saved);
+    widget.onFinished(session);
   }
 
   @override
@@ -123,7 +116,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: _isSaving ? null : _minimize,
+                        onPressed: _minimize,
                         icon: const Icon(Icons.keyboard_arrow_down),
                         tooltip: 'Minimize live session',
                       ),
@@ -137,7 +130,7 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                         ),
                       ),
                       TextButton(
-                        onPressed: _isSaving ? null : _confirmDiscard,
+                        onPressed: _confirmDiscard,
                         child: Text(
                           'Discard',
                           style: textTheme.labelLarge?.copyWith(
@@ -271,11 +264,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                         children: [
                           Expanded(
                             child: OutlinedButton.icon(
-                              onPressed: _isSaving
-                                  ? null
-                                  : (_controller.isPaused
-                                        ? _controller.resume
-                                        : _controller.pause),
+                              onPressed: _controller.isPaused
+                                  ? _controller.resume
+                                  : _controller.pause,
                               icon: Icon(
                                 _controller.isPaused
                                     ? Icons.play_arrow
@@ -289,17 +280,9 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: _isSaving ? null : _finish,
-                              icon: _isSaving
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(Icons.stop_rounded),
-                              label: Text(_isSaving ? 'Saving…' : 'Finish'),
+                              onPressed: _finish,
+                              icon: const Icon(Icons.stop_rounded),
+                              label: const Text('Finish'),
                             ),
                           ),
                         ],
