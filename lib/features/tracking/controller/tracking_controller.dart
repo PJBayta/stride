@@ -9,15 +9,16 @@ import '../../../models/finished_session.dart';
 import '../../../models/measurement_unit.dart';
 import '../../../services/kalman_location_filter.dart';
 import '../../../services/location_service.dart';
+import '../../../services/met_calculator.dart';
 import '../../../services/step_counter_service.dart';
 import '../../../services/tracking_notification_service.dart';
 import '../../settings/controller/settings_controller.dart';
 
 enum TrackingStatus { idle, tracking, error }
 
-/// Assumed body weight used for a rough calorie estimate, in kilograms.
+/// Default body weight in kg used for calorie estimation.
 /// Replace with a real per-user value once Settings/Profile exposes one.
-const _assumedWeightKg = 70.0;
+const _defaultWeightKg = 70.0;
 
 /// Owns GPS tracking state for a single live session: permission/service
 /// checks, the position stream, an elapsed-time stopwatch, and the in-memory
@@ -34,11 +35,19 @@ class TrackingController extends ChangeNotifier {
   final KalmanLocationFilter _kalmanFilter = KalmanLocationFilter();
   final StepCounterService _stepCounterService = StepCounterService();
 
+  // Initialised in start() once the activity type is known.
+  late MetCalculator _metCalculator;
+
   StreamSubscription<Position>? _positionSubscription;
   Timer? _ticker;
   Duration _accumulated = Duration.zero;
   DateTime? _segmentStart;
   DateTime? _sessionStartedAt;
+
+  // Timestamp of the last accepted GPS fix, used to compute per-interval
+  // elapsed time for incremental calorie accumulation.
+  DateTime? _lastPositionTime;
+
   ActivityType? _activityType;
   int _distanceFilter = 2;
 
@@ -97,15 +106,25 @@ class TrackingController extends ChangeNotifier {
     _segmentStart = _sessionStartedAt;
     _recordedPositions.clear();
     _totalDistanceMeters = 0;
+    _lastPositionTime = null;
     _kalmanFilter.reset();
+
+    // Initialise a fresh MetCalculator for this session.
+    _metCalculator = MetCalculator(
+      activityType: activityType,
+      weightKg: _defaultWeightKg,
+    );
+
     isPaused = false;
     errorMessage = null;
     status = TrackingStatus.tracking;
+
     // Only count steps for foot-based activities (run, walk).
     // Bike sessions produce no footsteps, so we skip the sensor entirely.
     if (_activityType != ActivityType.bike) {
       _stepCounterService.startListening();
     }
+
     _startListening();
     TrackingNotificationService.start(activityType);
     _updateNotification();
@@ -118,6 +137,7 @@ class TrackingController extends ChangeNotifier {
     if (status != TrackingStatus.tracking || isPaused) return;
     _accumulated += DateTime.now().difference(_segmentStart!);
     _segmentStart = null;
+    _lastPositionTime = null; // Reset interval timer — no GPS while paused.
     isPaused = true;
     _stopListening();
     notifyListeners();
@@ -156,6 +176,10 @@ class TrackingController extends ChangeNotifier {
         : _stepCounterService.stopAndCalculateSteps(
             totalDistanceMeters: _totalDistanceMeters,
           );
+
+    // Capture accumulated calories before stop() clears session state.
+    final int calories = _metCalculator.calories;
+
     stop();
     if (_recordedPositions.isEmpty || _sessionStartedAt == null) return null;
 
@@ -167,8 +191,6 @@ class TrackingController extends ChangeNotifier {
     final double avgPaceSecondsPerKm = distanceKm > 0
         ? totalSeconds.toDouble() / distanceKm
         : 0.0;
-    final double hours = totalSeconds / 3600.0;
-    final int calories = (_activityType!.met * _assumedWeightKg * hours).round();
 
     return FinishedSession(
       activityType: _activityType!,
@@ -194,19 +216,23 @@ class TrackingController extends ChangeNotifier {
     _recordedPositions.clear();
     _totalDistanceMeters = 0;
     _sessionStartedAt = null;
+    _lastPositionTime = null;
     _kalmanFilter.reset();
+    _metCalculator.reset();
   }
 
   void _updateNotification() {
     if (_activityType == null) return;
     final MeasurementUnit units = settingsController.measurementUnit;
     final double distVal = units.distanceFromMeters(_totalDistanceMeters);
-    final String distText = '${distVal.toStringAsFixed(2)} ${units.distanceLabel}';
+    final String distText =
+        '${distVal.toStringAsFixed(2)} ${units.distanceLabel}';
     final String durText = formatDuration(elapsed);
 
     final double speedMps = currentPosition?.speed ?? 0.0;
     final double speedVal = units.speedFromMetersPerSecond(speedMps);
-    final String speedText = '${speedVal.toStringAsFixed(1)} ${units.speedLabel}';
+    final String speedText =
+        '${speedVal.toStringAsFixed(1)} ${units.speedLabel}';
 
     TrackingNotificationService.update(
       activityType: _activityType!,
@@ -232,6 +258,19 @@ class TrackingController extends ChangeNotifier {
                 position.longitude,
               );
             }
+
+            // Accumulate speed-based calories for this GPS interval.
+            final now = DateTime.now();
+            final double intervalSeconds = _lastPositionTime != null
+                ? now.difference(_lastPositionTime!).inMilliseconds / 1000.0
+                : 0.0;
+            _lastPositionTime = now;
+
+            _metCalculator.update(
+              rawSpeedMps: position.speed.clamp(0.0, double.infinity),
+              intervalSeconds: intervalSeconds,
+            );
+
             currentPosition = position;
             _recordedPositions.add(position);
             _updateNotification();

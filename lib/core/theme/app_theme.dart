@@ -33,11 +33,11 @@ abstract final class AppTheme {
     tertiaryContainer: Color(0xFF104D6D), onTertiaryContainer: Color(0xFFC7E7FF),
     error: Color(0xFFFFB4AB), onError: Color(0xFF690005),
     errorContainer: Color(0xFF93000A), onErrorContainer: Color(0xFFFFDAD6),
-    surface: Color(0xFF101411), onSurface: Color(0xFFE0E4DE),
-    surfaceContainerHighest: Color(0xFF424942), onSurfaceVariant: Color(0xFFC0C9C0),
-    outline: Color(0xFF8A938A), outlineVariant: Color(0xFF404941),
+    surface: Color(0xFF161C2A), onSurface: Color(0xFFE2E8F0),
+    surfaceContainerHighest: Color(0xFF232A3B), onSurfaceVariant: Color(0xFFC2C7D0),
+    outline: Color(0xFF8B93A0), outlineVariant: Color(0xFF353C4D),
     shadow: Color(0xFF000000), scrim: Color(0xFF000000),
-    inverseSurface: Color(0xFFE0E4DE), onInverseSurface: Color(0xFF2E312E),
+    inverseSurface: Color(0xFFE2E8F0), onInverseSurface: Color(0xFF161C2A),
     inversePrimary: Color(0xFF006D3B),
   );
 
@@ -95,7 +95,8 @@ abstract final class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: isDark ? const Color(0xFF191E1A) : const Color(0xFFFFFFFF),
+        // Elevated card background slightly lighter than #161C2A for depth
+        color: isDark ? const Color(0xFF1E2538) : const Color(0xFFFFFFFF),
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
