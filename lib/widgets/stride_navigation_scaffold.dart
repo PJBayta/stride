@@ -24,18 +24,32 @@ class _StrideNavigationScaffoldState extends State<StrideNavigationScaffold> {
         index: _selectedIndex,
         children: widget.destinations.map((destination) => destination.screen).toList(),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) => setState(() => _selectedIndex = index),
-        destinations: widget.destinations
-            .map(
-              (destination) => NavigationDestination(
-                icon: Icon(destination.icon),
-                selectedIcon: Icon(destination.selectedIcon ?? destination.icon),
-                label: destination.label,
-              ),
-            )
-            .toList(),
+      bottomNavigationBar: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? const Color(0xFFE5E7EB)
+                  : Theme.of(context).colorScheme.outlineVariant,
+            ),
+          ),
+        ),
+        child: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: (index) =>
+              setState(() => _selectedIndex = index),
+          destinations: widget.destinations
+              .map(
+                (destination) => NavigationDestination(
+                  icon: Icon(destination.icon),
+                  selectedIcon: Icon(
+                    destination.selectedIcon ?? destination.icon,
+                  ),
+                  label: destination.label,
+                ),
+              )
+              .toList(),
+        ),
       ),
     );
   }

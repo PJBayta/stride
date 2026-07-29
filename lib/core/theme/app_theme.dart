@@ -7,20 +7,20 @@ import 'package:flutter/material.dart';
 abstract final class AppTheme {
   static const _lightScheme = ColorScheme(
     brightness: Brightness.light,
-    primary: Color(0xFF006D3B), onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFF9BF6BF), onPrimaryContainer: Color(0xFF00210F),
+    primary: Color(0xFF34C759), onPrimary: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFB8F5C8), onPrimaryContainer: Color(0xFF00210F),
     secondary: Color(0xFF356A52), onSecondary: Color(0xFFFFFFFF),
     secondaryContainer: Color(0xFFB8F2D1), onSecondaryContainer: Color(0xFF002113),
     tertiary: Color(0xFF2A6B8E), onTertiary: Color(0xFFFFFFFF),
     tertiaryContainer: Color(0xFFC7E7FF), onTertiaryContainer: Color(0xFF001F2E),
     error: Color(0xFFBA1A1A), onError: Color(0xFFFFFFFF),
     errorContainer: Color(0xFFFFDAD6), onErrorContainer: Color(0xFF410002),
-    surface: Color(0xFFF8FBF6), onSurface: Color(0xFF191C1A),
+    surface: Color(0xFFF7F7F7), onSurface: Color(0xFF191C1A),
     surfaceContainerHighest: Color(0xFFDDE5DD), onSurfaceVariant: Color(0xFF404941),
     outline: Color(0xFF707970), outlineVariant: Color(0xFFC0C9C0),
     shadow: Color(0xFF000000), scrim: Color(0xFF000000),
     inverseSurface: Color(0xFF2E312E), onInverseSurface: Color(0xFFEFF1EC),
-    inversePrimary: Color(0xFF7DDBA1),
+    inversePrimary: Color(0xFF34C759),
   );
 
   static const _darkScheme = ColorScheme(
@@ -46,16 +46,19 @@ abstract final class AppTheme {
 
   static ThemeData _buildTheme(ColorScheme colorScheme) {
     final isDark = colorScheme.brightness == Brightness.dark;
+    final appBarBackground = isDark ? colorScheme.surface : Colors.white;
+    final navigationBackground = isDark ? colorScheme.surface : Colors.white;
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colorScheme.surface,
       appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: appBarBackground,
         foregroundColor: colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: false,
         titleTextStyle: TextStyle(
           color: colorScheme.onSurface,
@@ -87,12 +90,34 @@ abstract final class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: navigationBackground,
         elevation: 0,
-        indicatorColor: colorScheme.secondaryContainer,
-        labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        ),
+        indicatorColor: isDark
+            ? colorScheme.secondaryContainer
+            : colorScheme.primary,
+        iconTheme: isDark
+            ? null
+            : WidgetStateProperty.resolveWith((states) {
+                final isSelected = states.contains(WidgetState.selected);
+                return IconThemeData(
+                  color: isSelected
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurfaceVariant,
+                );
+              }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final isSelected = states.contains(WidgetState.selected);
+          return TextStyle(
+            color: isSelected && !isDark
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          );
+        }),
+      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: colorScheme.primary,
       ),
       cardTheme: CardThemeData(
         // Elevated card background slightly lighter than #161C2A for depth

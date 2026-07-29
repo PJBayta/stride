@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../../models/activity_stats.dart';
+import '../../../models/user_profile.dart';
+import '../controller/profile_controller.dart';
 import '../../settings/controller/settings_controller.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -15,7 +17,7 @@ class ProfileScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Athlete Profile'), centerTitle: true),
       body: ListenableBuilder(
-        listenable: settingsController,
+        listenable: Listenable.merge([settingsController, profileController]),
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: [
@@ -55,22 +57,17 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              'Alex Rivera',
+              profileController.profile.name,
               textAlign: TextAlign.center,
               style: text.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Member since 2023',
-              textAlign: TextAlign.center,
-              style: text.bodySmall?.copyWith(color: colors.onSurfaceVariant),
-            ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile editing is coming soon.'),
-                ),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => const _EditProfileSheet(),
               ),
               child: const Text('EDIT PROFILE'),
             ),
@@ -197,6 +194,148 @@ class ProfileScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _EditProfileSheet extends StatefulWidget {
+  const _EditProfileSheet();
+
+  @override
+  State<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends State<_EditProfileSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _weightController;
+  late final TextEditingController _heightController;
+  String? _gender;
+  var _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = profileController.profile;
+    _nameController = TextEditingController(text: profile.name);
+    _weightController = TextEditingController(
+      text: profile.weightKg.toStringAsFixed(1),
+    );
+    _heightController = TextEditingController(
+      text: profile.heightCm?.toStringAsFixed(1) ?? '',
+    );
+    _gender = profile.gender;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    await profileController.saveProfile(
+      UserProfile(
+        name: _nameController.text.trim(),
+        weightKg: double.parse(_weightController.text.trim()),
+        heightCm: _heightController.text.trim().isEmpty
+            ? null
+            : double.parse(_heightController.text.trim()),
+        gender: _gender,
+      ),
+    );
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        12,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Edit Profile',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: _nameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter your name'
+                    : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _weightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Weight (kg)'),
+                validator: _validatePositiveNumber,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _heightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'Height (cm) · optional'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? null
+                    : _validatePositiveNumber(value),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                initialValue: _gender,
+                decoration: const InputDecoration(labelText: 'Gender · optional'),
+                items: const [
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                  DropdownMenuItem(value: 'non_binary', child: Text('Non-binary')),
+                  DropdownMenuItem(value: 'prefer_not_to_say', child: Text('Prefer not to say')),
+                ],
+                onChanged: (value) => setState(() => _gender = value),
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: _isSaving ? null : _save,
+                child: Text(_isSaving ? 'SAVING...' : 'SAVE CHANGES'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String? _validatePositiveNumber(String? value) {
+    final parsed = double.tryParse(value?.trim() ?? '');
+    return parsed == null || parsed <= 0 ? 'Enter a value greater than 0' : null;
   }
 }
 

@@ -8,6 +8,12 @@ import '../../../models/activity_type.dart';
 import '../../../models/finished_session.dart';
 import 'route_map_view.dart';
 
+/// Matches the Material bottom-sheet motion for both opening and dismissal.
+const summarySheetAnimationStyle = AnimationStyle(
+  duration: Duration(milliseconds: 320),
+  reverseDuration: Duration(milliseconds: 240),
+);
+
 /// Shows [SessionSummarySheet] for an already-saved activity, e.g. when
 /// tapping a card in Home's recent list or the History tab. "Save" just
 /// closes the sheet; "Discard" deletes the activity (its GPS points
@@ -17,7 +23,10 @@ Future<void> showActivitySummarySheet(BuildContext context, Activity activity) {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    isDismissible: true,
+    enableDrag: true,
     backgroundColor: Colors.transparent,
+    sheetAnimationStyle: summarySheetAnimationStyle,
     builder: (sheetContext) => FractionallySizedBox(
       heightFactor: 0.92,
       child: SessionSummarySheet.fromActivity(
@@ -90,6 +99,8 @@ class SessionSummarySheet extends StatelessWidget {
   final VoidCallback onSave;
   final VoidCallback onHome;
   final VoidCallback onDiscard;
+
+  bool get _isSavedActivity => savedActivityId != null;
 
   @override
   Widget build(BuildContext context) {
@@ -260,34 +271,62 @@ class SessionSummarySheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 20),
-            SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: onSave,
-                icon: const Icon(Icons.save_outlined),
-                label: const Text('SAVE ACTIVITY'),
+            if (_isSavedActivity)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onHome,
+                      icon: const Icon(Icons.done),
+                      label: const Text('DONE'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.error,
+                      ),
+                      onPressed: onDiscard,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('DELETE ACTIVITY'),
+                    ),
+                  ),
+                ],
+              )
+            else ...[
+              SizedBox(
+                height: 52,
+                child: FilledButton.icon(
+                  onPressed: onSave,
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('SAVE ACTIVITY'),
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onHome,
-                    icon: const Icon(Icons.home_outlined),
-                    label: const Text('HOME'),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onHome,
+                      icon: const Icon(Icons.home_outlined),
+                      label: const Text('HOME'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onDiscard,
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('DISCARD'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.error,
+                      ),
+                      onPressed: onDiscard,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('DISCARD ACTIVITY'),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

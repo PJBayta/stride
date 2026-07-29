@@ -32,19 +32,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('Activity History'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Additional filters are coming soon.'),
-                ),
-              );
-            },
-            icon: const Icon(Icons.tune),
-            tooltip: 'More filters',
-          ),
-        ],
       ),
       body: ListenableBuilder(
         listenable: settingsController,

@@ -13,6 +13,7 @@ import '../../../services/met_calculator.dart';
 import '../../../services/step_counter_service.dart';
 import '../../../services/tracking_notification_service.dart';
 import '../../settings/controller/settings_controller.dart';
+import '../../profile/controller/profile_controller.dart';
 
 enum TrackingStatus { idle, tracking, error }
 
@@ -175,6 +176,7 @@ class TrackingController extends ChangeNotifier {
         ? 0
         : _stepCounterService.stopAndCalculateSteps(
             totalDistanceMeters: _totalDistanceMeters,
+            stepLengthMeters: profileController.strideLengthMeters,
           );
 
     // Capture accumulated calories before stop() clears session state.
@@ -210,7 +212,10 @@ class TrackingController extends ChangeNotifier {
   /// the user cancels instead of finishing an activity.
   void cancel() {
     if (_activityType != ActivityType.bike) {
-      _stepCounterService.stopAndCalculateSteps(totalDistanceMeters: 0);
+      _stepCounterService.stopAndCalculateSteps(
+        totalDistanceMeters: 0,
+        stepLengthMeters: profileController.strideLengthMeters,
+      );
     }
     stop();
     _recordedPositions.clear();

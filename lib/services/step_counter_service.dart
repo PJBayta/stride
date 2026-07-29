@@ -7,8 +7,6 @@ class StepCounterService {
   StreamSubscription<StepCount>? _stepSubscription;
   bool _isSensorAvailable = true;
 
-  static const double defaultStepLengthInMeters = 0.762; // Average step length in meters
-
   void startListening() {
     _initialStepCount = null;
     _latestStepCount = null;
@@ -32,7 +30,7 @@ class StepCounterService {
 
   int stopAndCalculateSteps({
     required double totalDistanceMeters,
-    double stepLengthMeters = defaultStepLengthInMeters,
+    required double stepLengthMeters,
   }) {
     _stepSubscription?.cancel();
     _stepSubscription = null;

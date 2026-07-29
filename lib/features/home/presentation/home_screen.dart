@@ -5,6 +5,7 @@ import '../../../data/database/app_database.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
 import '../../tracking/controller/tracking_controller.dart';
+import '../../tracking/controller/pending_activity_controller.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
 
@@ -33,11 +34,14 @@ class _HomeScreenState extends State<HomeScreen> {
         heightFactor: 0.92,
         child: LiveSessionSheet(
           activityType: type,
-          onFinished: (session) => _showSessionSummary(
-            homeContext,
-            sheetContext,
-            session,
-          ),
+          onFinished: (session) {
+            pendingActivityController.hold(session);
+            _showSessionSummary(
+              homeContext,
+              session,
+              sheetContext,
+            );
+          },
         ),
       ),
     );
@@ -51,10 +55,16 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Home'), centerTitle: true),
       body: ListenableBuilder(
-        listenable: Listenable.merge([settingsController, trackingController]),
+          listenable: Listenable.merge([
+            settingsController,
+            trackingController,
+            pendingActivityController,
+          ]),
         builder: (context, _) {
           final isTracking = trackingController.isTracking;
           final activeActivity = trackingController.activityType ?? _selectedActivity;
+          final pendingSession = pendingActivityController.session;
+          final hasPendingActivity = pendingSession != null;
 
           return SafeArea(
             top: false,
@@ -110,17 +120,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   height: 52,
                   child: FilledButton.icon(
-                    onPressed: () => _openLiveSessionSheet(
-                      context,
-                      isTracking ? activeActivity : _selectedActivity,
-                    ),
+                    onPressed: hasPendingActivity
+                        ? () => _showSessionSummary(context, pendingSession)
+                        : () => _openLiveSessionSheet(
+                            context,
+                            isTracking ? activeActivity : _selectedActivity,
+                          ),
                     icon: Icon(
-                      isTracking
+                      hasPendingActivity
+                          ? Icons.rate_review_outlined
+                          : isTracking
                           ? Icons.directions_run_rounded
                           : Icons.play_arrow_rounded,
                     ),
                     label: Text(
-                      isTracking ? 'ACTIVITY IN PROGRESS' : 'START ACTIVITY',
+                      hasPendingActivity
+                          ? 'REVIEW ACTIVITY'
+                          : isTracking
+                          ? 'ACTIVITY IN PROGRESS'
+                          : 'START ACTIVITY',
                     ),
                   ),
                 ),
@@ -136,7 +154,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       letterSpacing: 0.8,
                     ),
                   ),
-                  TextButton(onPressed: () {}, child: const Text('See all')),
                 ],
               ),
               const SizedBox(height: 8),
@@ -200,15 +217,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showSessionSummary(
     BuildContext homeContext,
-    BuildContext sheetContext,
     FinishedSession session,
+    [BuildContext? sheetContext]
   ) {
-    Navigator.of(sheetContext).pop();
+    if (sheetContext != null) {
+      Navigator.of(sheetContext).pop();
+    }
     showModalBottomSheet<void>(
       context: homeContext,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      isDismissible: true,
+      enableDrag: true,
+      sheetAnimationStyle: summarySheetAnimationStyle,
       builder: (summaryContext) => FractionallySizedBox(
         heightFactor: 0.92,
         child: SessionSummarySheet.fromFinishedSession(
@@ -216,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onSave: () async {
             await ActivityRepository(appDatabase).saveSession(session);
             if (!summaryContext.mounted) return;
+            pendingActivityController.clear();
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(
               homeContext,
@@ -223,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           onHome: () => Navigator.of(summaryContext).pop(),
           onDiscard: () {
+            pendingActivityController.clear();
             Navigator.of(summaryContext).pop();
             ScaffoldMessenger.of(homeContext).showSnackBar(
               const SnackBar(content: Text('Activity discarded.')),
@@ -248,10 +272,15 @@ class _ActivitySelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final backgroundColor = isSelected
+    final isLightTheme = Theme.of(context).brightness == Brightness.light;
+    final backgroundColor = isSelected && isLightTheme
+        ? colorScheme.primary
+        : isSelected
         ? colorScheme.primaryContainer
         : colorScheme.surfaceContainerHighest.withValues(alpha: 0.45);
-    final foregroundColor = isSelected
+    final foregroundColor = isSelected && isLightTheme
+        ? colorScheme.onPrimary
+        : isSelected
         ? colorScheme.onPrimaryContainer
         : colorScheme.onSurfaceVariant;
 
