@@ -6,12 +6,28 @@ import '../../../models/activity_stats.dart';
 import '../../../models/activity_type.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
+import '../../../widgets/activity_card.dart';
 
 HistoryFilter _filterForActivityType(ActivityType type) => switch (type) {
   ActivityType.run => HistoryFilter.running,
   ActivityType.bike => HistoryFilter.cycling,
   ActivityType.walk => HistoryFilter.walking,
 };
+
+const _monthNames = [
+  'JANUARY',
+  'FEBRUARY',
+  'MARCH',
+  'APRIL',
+  'MAY',
+  'JUNE',
+  'JULY',
+  'AUGUST',
+  'SEPTEMBER',
+  'OCTOBER',
+  'NOVEMBER',
+  'DECEMBER',
+];
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -27,6 +43,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final text = Theme.of(context).textTheme;
+    final now = DateTime.now();
+    final monthStart = DateTime(now.year, now.month);
+    final monthName = _monthNames[now.month - 1];
 
     return Scaffold(
       appBar: AppBar(
@@ -38,30 +57,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
         builder: (context, _) => ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           children: [
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: HistoryFilter.values
-                    .map(
-                      (filter) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(filter.label),
-                          selected: filter == _selectedFilter,
-                          onSelected: (_) =>
-                              setState(() => _selectedFilter = filter),
+            ScrollConfiguration(
+              behavior: ScrollConfiguration.of(
+                context,
+              ).copyWith(scrollbars: false),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: HistoryFilter.values
+                      .map(
+                        (filter) => Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(filter.label),
+                            selected: filter == _selectedFilter,
+                            onSelected: (_) =>
+                                setState(() => _selectedFilter = filter),
+                          ),
                         ),
-                      ),
-                    )
-                    .toList(),
+                      )
+                      .toList(),
+                ),
               ),
             ),
             const SizedBox(height: 20),
             StreamBuilder<ActivityStats>(
-              stream: appDatabase.activitiesDao.watchStats(
-                since: DateTime(DateTime.now().year, DateTime.now().month),
-              ),
+              stream: appDatabase.activitiesDao.watchStats(since: monthStart),
               builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return _MonthlySummaryError(message: snapshot.error.toString());
+                }
+
                 final stats = snapshot.data ?? ActivityStats.zero;
                 final units = settingsController.measurementUnit;
                 final distance = units.distanceFromMeters(
@@ -74,16 +100,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 return Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: colors.primary,
-                    borderRadius: BorderRadius.circular(18),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        colors.primary.withValues(alpha: 0.16),
+                        colors.primary.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.2),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'TOTAL DISTANCE THIS MONTH',
+                        'TOTAL DISTANCE THIS $monthName',
                         style: text.labelSmall?.copyWith(
-                          color: colors.onPrimary.withValues(alpha: 0.8),
+                          color: colors.primary.withValues(alpha: 0.85),
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.7,
                         ),
@@ -92,7 +128,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       RichText(
                         text: TextSpan(
                           style: text.headlineMedium?.copyWith(
-                            color: colors.onPrimary,
+                            color: colors.onSurface,
                             fontWeight: FontWeight.w700,
                           ),
                           children: [
@@ -100,7 +136,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             TextSpan(
                               text: ' ${units.distanceLabel}',
                               style: text.titleSmall?.copyWith(
-                                color: colors.onPrimary,
+                                color: colors.primary.withValues(alpha: 0.85),
                               ),
                             ),
                           ],
@@ -112,13 +148,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           _SummaryValue(
                             label: 'SESSIONS',
                             value: stats.totalActivities.toString(),
-                            color: colors.onPrimary,
+                            color: colors.onSurface,
                           ),
                           const SizedBox(width: 34),
                           _SummaryValue(
                             label: 'AVG. PACE',
                             value: '${formatPace(pace)} ${units.paceLabel}',
-                            color: colors.onPrimary,
+                            color: colors.onSurface,
                           ),
                         ],
                       ),
@@ -134,7 +170,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(
-                    'ALL ACTIVITIES',
+                    'All activities',
                     style: text.labelSmall?.copyWith(
                       color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w700,
@@ -161,14 +197,49 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     .toList();
 
                 if (activities.isEmpty) {
+                  final filterLabel = _selectedFilter == HistoryFilter.all
+                      ? 'activities'
+                      : '${_selectedFilter.label.toLowerCase()} activities';
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 48),
+                    padding: const EdgeInsets.symmetric(vertical: 32),
                     child: Center(
-                      child: Text(
-                        'No ${_selectedFilter.label.toLowerCase()} activities yet.',
-                        style: text.bodyLarge?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: colors.primary.withValues(alpha: 0.12),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.route_outlined,
+                              size: 28,
+                              color: colors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            'No $filterLabel yet',
+                            style: text.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                            ),
+                            child: Text(
+                              'Your runs, rides, and walks will show up '
+                              'here once you log your first session.',
+                              textAlign: TextAlign.center,
+                              style: text.bodyMedium?.copyWith(
+                                color: colors.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -179,7 +250,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     for (final activity in activities)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: _ActivityHistoryCard.fromActivity(
+                        child: ActivityCard.fromActivity(
                           activity,
                           onTap: () =>
                               showActivitySummarySheet(context, activity),
@@ -196,6 +267,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 }
 
+class _MonthlySummaryError extends StatelessWidget {
+  const _MonthlySummaryError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Text(
+        'Could not load this month\'s activity summary.\n$message',
+        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+          color: colors.onErrorContainer,
+        ),
+      ),
+    );
+  }
+}
+
 enum HistoryFilter {
   all('All'),
   running('Running'),
@@ -204,120 +299,6 @@ enum HistoryFilter {
 
   const HistoryFilter(this.label);
   final String label;
-}
-
-class _ActivityHistoryCard extends StatelessWidget {
-  const _ActivityHistoryCard({
-    required this.typeLabel,
-    required this.date,
-    required this.distance,
-    required this.duration,
-    required this.energy,
-    required this.icon,
-    required this.imageIcon,
-    required this.onTap,
-  });
-
-  factory _ActivityHistoryCard.fromActivity(
-    Activity activity, {
-    required VoidCallback onTap,
-  }) {
-    final type = ActivityType.fromDbValue(activity.activityType);
-    final units = settingsController.measurementUnit;
-    return _ActivityHistoryCard(
-      typeLabel: type.label,
-      date: formatHistoryTimestamp(activity.startTime),
-      distance:
-          '${units.distanceFromMeters(activity.distanceMeters).toStringAsFixed(1)} ${units.distanceLabel}',
-      duration: formatDuration(Duration(seconds: activity.durationSeconds)),
-      energy: '${activity.calories} kcal',
-      icon: type.icon,
-      imageIcon: type.placeholderIcon,
-      onTap: onTap,
-    );
-  }
-
-  final String typeLabel;
-  final String date;
-  final String distance;
-  final String duration;
-  final String energy;
-  final IconData icon;
-  final IconData imageIcon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 112,
-          child: Row(
-            children: [
-              Container(
-                width: 72,
-                height: double.infinity,
-                color: colors.tertiaryContainer,
-                alignment: Alignment.center,
-                child: Icon(imageIcon, color: colors.onTertiaryContainer),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            typeLabel.toUpperCase(),
-                            style: text.labelLarge?.copyWith(
-                              color: colors.primary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Icon(icon, size: 15, color: colors.primary),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        date,
-                        style: text.labelSmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                      const Spacer(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _Stat(label: 'DISTANCE', value: distance),
-                          ),
-                          Expanded(
-                            child: _Stat(label: 'TIME', value: duration),
-                          ),
-                          Expanded(
-                            child: _Stat(label: 'ENERGY', value: energy),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_right, color: colors.onSurfaceVariant),
-              const SizedBox(width: 4),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _SummaryValue extends StatelessWidget {
@@ -351,35 +332,4 @@ class _SummaryValue extends StatelessWidget {
       ),
     ],
   );
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: text.labelSmall?.copyWith(
-            color: colors.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          child: Text(
-            value,
-            style: text.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-      ],
-    );
-  }
 }

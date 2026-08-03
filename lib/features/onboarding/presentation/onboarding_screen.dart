@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/legal/legal_documents.dart';
 import '../../../models/user_profile.dart';
+import '../../../widgets/legal_document_screen.dart';
 import '../../profile/controller/profile_controller.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -128,6 +130,31 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onPressed: _isSaving ? null : _completeOnboarding,
                       child: Text(_isSaving ? 'SAVING...' : 'CONTINUE'),
                     ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          'By continuing, you agree to the ',
+                          style: text.labelSmall,
+                        ),
+                        TextButton(
+                          onPressed: () => _openLegalDocument(
+                            LegalDocument.termsOfService,
+                          ),
+                          child: const Text('Terms of Service'),
+                        ),
+                        Text(' and ', style: text.labelSmall),
+                        TextButton(
+                          onPressed: () => _openLegalDocument(
+                            LegalDocument.privacyPolicy,
+                          ),
+                          child: const Text('Privacy Policy'),
+                        ),
+                        Text('.', style: text.labelSmall),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -141,5 +168,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String? _positiveNumberValidator(String? value) {
     final parsed = double.tryParse(value?.trim() ?? '');
     return parsed == null || parsed <= 0 ? 'Enter a value greater than 0' : null;
+  }
+
+  void _openLegalDocument(LegalDocument document) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LegalDocumentScreen(document: document),
+      ),
+    );
   }
 }

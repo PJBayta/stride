@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/format.dart';
 import '../../../data/database/app_database.dart';
 import '../../settings/controller/settings_controller.dart';
 import '../../../models/activity_type.dart';
@@ -8,6 +7,7 @@ import '../../tracking/controller/tracking_controller.dart';
 import '../../tracking/controller/pending_activity_controller.dart';
 import '../../tracking/presentation/live_session_sheet.dart';
 import '../../tracking/presentation/session_summary_sheet.dart';
+import '../../../widgets/activity_card.dart';
 
 import '../../../data/repositories/activity_repository.dart';
 import '../../../models/finished_session.dart';
@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       for (var i = 0; i < recent.length; i++) ...[
                         if (i > 0) const SizedBox(height: 10),
-                        _RecentActivityCard.fromActivity(
+                        ActivityCard.fromActivity(
                           recent[i],
                           onTap: () =>
                               showActivitySummarySheet(context, recent[i]),
@@ -257,7 +257,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
-
 class _ActivitySelector extends StatelessWidget {
   const _ActivitySelector({
     required this.activity,
@@ -318,119 +317,6 @@ class _ActivitySelector extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RecentActivityCard extends StatelessWidget {
-  const _RecentActivityCard({
-    required this.title,
-    required this.detail,
-    required this.distance,
-    required this.duration,
-    required this.icon,
-    required this.placeholderIcon,
-    required this.onTap,
-  });
-
-  factory _RecentActivityCard.fromActivity(
-    Activity activity, {
-    required VoidCallback onTap,
-  }) {
-    final type = ActivityType.fromDbValue(activity.activityType);
-    final units = settingsController.measurementUnit;
-    return _RecentActivityCard(
-      title: '${type.label} Session',
-      detail: formatRelativeSessionTimestamp(activity.startTime),
-      distance:
-          '${units.distanceFromMeters(activity.distanceMeters).toStringAsFixed(2)} ${units.distanceLabel}',
-      duration: formatDuration(Duration(seconds: activity.durationSeconds)),
-      icon: type.icon,
-      placeholderIcon: type.placeholderIcon,
-      onTap: onTap,
-    );
-  }
-
-  final String title;
-  final String detail;
-  final String distance;
-  final String duration;
-  final IconData icon;
-  final IconData placeholderIcon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 104,
-          child: Row(
-            children: [
-              Container(
-                width: 92,
-                color: colorScheme.tertiaryContainer,
-                alignment: Alignment.center,
-                child: Icon(
-                  placeholderIcon,
-                  size: 32,
-                  color: colorScheme.onTertiaryContainer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(icon, size: 15, color: colorScheme.primary),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              detail.toUpperCase(),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: textTheme.labelSmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        title,
-                        style: textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '$distance   •   $duration',
-                        style: textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-            ],
           ),
         ),
       ),

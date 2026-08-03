@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/legal/legal_documents.dart';
 import '../../../models/gps_accuracy.dart';
 import '../../../models/measurement_unit.dart';
+import '../../../widgets/legal_document_screen.dart';
 import '../controller/settings_controller.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -97,11 +99,19 @@ class SettingsScreen extends StatelessWidget {
                   _AboutTile(
                     icon: Icons.privacy_tip_outlined,
                     title: 'Privacy Policy',
+                    onTap: () => _openLegalDocument(
+                      context,
+                      LegalDocument.privacyPolicy,
+                    ),
                   ),
                   const Divider(height: 1),
                   _AboutTile(
                     icon: Icons.shield_outlined,
                     title: 'Terms of Service',
+                    onTap: () => _openLegalDocument(
+                      context,
+                      LegalDocument.termsOfService,
+                    ),
                   ),
                 ],
               ),
@@ -116,6 +126,14 @@ class SettingsScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openLegalDocument(BuildContext context, LegalDocument document) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LegalDocumentScreen(document: document),
       ),
     );
   }
@@ -158,16 +176,19 @@ class _SettingsCard extends StatelessWidget {
 }
 
 class _AboutTile extends StatelessWidget {
-  const _AboutTile({required this.icon, required this.title});
+  const _AboutTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
   final IconData icon;
   final String title;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) => ListTile(
     leading: Icon(icon),
     title: Text(title),
     trailing: const Icon(Icons.chevron_right),
-    onTap: () => ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$title is coming soon.'))),
+    onTap: onTap,
   );
 }

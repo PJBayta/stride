@@ -147,35 +147,16 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Container(color: colorScheme.tertiaryContainer),
-                      CustomPaint(
-                        painter: _MapPlaceholderPainter(
-                          routeColor: colorScheme.primary,
-                          lineColor: colorScheme.onTertiaryContainer.withValues(
-                            alpha: 0.2,
-                          ),
-                        ),
-                      ),
+                      Container(color: colorScheme.surfaceContainerLow),
                       Positioned(
                         left: 16,
                         top: 16,
                         child: _GpsStatusChip(controller: _controller),
                       ),
                       Center(
-                        child: Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ),
-                      Center(
-                        child: Icon(
-                          widget.activityType.icon,
-                          size: 36,
-                          color: colorScheme.onPrimary,
+                        child: _PulseIndicator(
+                          icon: widget.activityType.icon,
+                          color: colorScheme.primary,
                         ),
                       ),
                     ],
@@ -206,6 +187,13 @@ class _LiveSessionSheetState extends State<LiveSessionSheet> {
                         style: textTheme.displayLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                           letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Map tracking is off to save battery',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -397,56 +385,81 @@ class _Metric extends StatelessWidget {
   }
 }
 
-class _MapPlaceholderPainter extends CustomPainter {
-  const _MapPlaceholderPainter({
-    required this.routeColor,
-    required this.lineColor,
-  });
+/// Lightweight "live" indicator used in place of a map. Two rings expand
+/// and fade out of phase around a static icon, driven by a single
+/// [AnimationController] — cheap opacity/scale transforms instead of a
+/// map SDK or per-frame [CustomPainter] work.
+class _PulseIndicator extends StatefulWidget {
+  const _PulseIndicator({required this.icon, required this.color});
 
-  final Color routeColor;
-  final Color lineColor;
+  final IconData icon;
+  final Color color;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = lineColor
-      ..strokeWidth = 1;
-    for (var offset = -size.height; offset < size.width; offset += 32) {
-      canvas.drawLine(
-        Offset(offset, 0),
-        Offset(offset + size.height, size.height),
-        linePaint,
-      );
-    }
+  State<_PulseIndicator> createState() => _PulseIndicatorState();
+}
 
-    final routePaint = Paint()
-      ..color = routeColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round;
-    final route = Path()
-      ..moveTo(size.width * .18, size.height * .83)
-      ..cubicTo(
-        size.width * .12,
-        size.height * .56,
-        size.width * .72,
-        size.height * .64,
-        size.width * .60,
-        size.height * .34,
-      )
-      ..cubicTo(
-        size.width * .54,
-        size.height * .17,
-        size.width * .81,
-        size.height * .20,
-        size.width * .86,
-        size.height * .10,
-      );
-    canvas.drawPath(route, routePaint);
+class _PulseIndicatorState extends State<_PulseIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
-  bool shouldRepaint(_MapPlaceholderPainter oldDelegate) =>
-      routeColor != oldDelegate.routeColor ||
-      lineColor != oldDelegate.lineColor;
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: SizedBox(
+        width: 150,
+        height: 150,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                _ring(_controller.value),
+                _ring((_controller.value + 0.5) % 1.0),
+                child!,
+              ],
+            );
+          },
+          child: Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: widget.color.withValues(alpha: 0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(widget.icon, size: 34, color: widget.color),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ring(double t) {
+    return Opacity(
+      opacity: (1 - t).clamp(0.0, 1.0),
+      child: Transform.scale(
+        scale: 0.64 + (0.51 * t),
+        child: Container(
+          width: 150,
+          height: 150,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: widget.color.withValues(alpha: 0.25)),
+          ),
+        ),
+      ),
+    );
+  }
 }
