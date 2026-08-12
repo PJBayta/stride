@@ -283,16 +283,9 @@ class SessionSummarySheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: colors.error,
-                        side: BorderSide(
-                          color: colors.error.withValues(alpha: 0.55),
-                        ),
-                      ),
+                    child: _DestructiveActivityButton(
                       onPressed: onDiscard,
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('DELETE ACTIVITY'),
+                      label: 'DELETE ACTIVITY',
                     ),
                   ),
                 ],
@@ -318,18 +311,50 @@ class SessionSummarySheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        foregroundColor: colors.error,
-                      ),
+                    child: _DestructiveActivityButton(
                       onPressed: onDiscard,
-                      icon: const Icon(Icons.delete_outline),
-                      label: const Text('DISCARD ACTIVITY'),
+                      label: 'DISCARD ACTIVITY',
                     ),
                   ),
                 ],
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DestructiveActivityButton extends StatelessWidget {
+  const _DestructiveActivityButton({
+    required this.onPressed,
+    required this.label,
+  });
+
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colors.error,
+        side: BorderSide(color: colors.error.withValues(alpha: 0.55)),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.delete_outline),
+            const SizedBox(width: 8),
+            Text(label, textAlign: TextAlign.center),
           ],
         ),
       ),
