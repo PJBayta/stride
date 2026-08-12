@@ -283,9 +283,12 @@ class SessionSummarySheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
                         foregroundColor: colors.error,
+                        side: BorderSide(
+                          color: colors.error.withValues(alpha: 0.55),
+                        ),
                       ),
                       onPressed: onDiscard,
                       icon: const Icon(Icons.delete_outline),

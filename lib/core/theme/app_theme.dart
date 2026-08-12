@@ -7,20 +7,20 @@ import 'package:flutter/material.dart';
 abstract final class AppTheme {
   static const _lightScheme = ColorScheme(
     brightness: Brightness.light,
-    primary: Color(0xFF34C759), onPrimary: Color(0xFFFFFFFF),
-    primaryContainer: Color(0xFFB8F5C8), onPrimaryContainer: Color(0xFF00210F),
+    primary: Color(0xFF1E9A63), onPrimary: Color(0xFFFFFFFF),
+    primaryContainer: Color(0xFFA8EFC7), onPrimaryContainer: Color(0xFF002114),
     secondary: Color(0xFF356A52), onSecondary: Color(0xFFFFFFFF),
     secondaryContainer: Color(0xFFB8F2D1), onSecondaryContainer: Color(0xFF002113),
     tertiary: Color(0xFF2A6B8E), onTertiary: Color(0xFFFFFFFF),
     tertiaryContainer: Color(0xFFC7E7FF), onTertiaryContainer: Color(0xFF001F2E),
     error: Color(0xFFBA1A1A), onError: Color(0xFFFFFFFF),
     errorContainer: Color(0xFFFFDAD6), onErrorContainer: Color(0xFF410002),
-    surface: Color(0xFFF7F7F7), onSurface: Color(0xFF191C1A),
-    surfaceContainerHighest: Color(0xFFDDE5DD), onSurfaceVariant: Color(0xFF404941),
-    outline: Color(0xFF707970), outlineVariant: Color(0xFFC0C9C0),
+    surface: Color(0xFFF6F8F5), onSurface: Color(0xFF1A211D),
+    surfaceContainerHighest: Color(0xFFE4EAE3), onSurfaceVariant: Color(0xFF404941),
+    outline: Color(0xFF707970), outlineVariant: Color(0xFFDDE3DB),
     shadow: Color(0xFF000000), scrim: Color(0xFF000000),
     inverseSurface: Color(0xFF2E312E), onInverseSurface: Color(0xFFEFF1EC),
-    inversePrimary: Color(0xFF34C759),
+    inversePrimary: Color(0xFF1E9A63),
   );
 
   static const _darkScheme = ColorScheme(

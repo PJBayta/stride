@@ -34,6 +34,8 @@ class RouteMapView extends StatefulWidget {
 class _RouteMapViewState extends State<RouteMapView> {
   /// Resolved asynchronously once; null while the provider is initialising.
   CachedTileProvider? _tileProvider;
+  final MapController _mapController = MapController();
+  var _isMapReady = false;
 
   @override
   void initState() {
@@ -44,6 +46,20 @@ class _RouteMapViewState extends State<RouteMapView> {
   Future<void> _initCache() async {
     final provider = await TileCacheService.getProvider();
     if (mounted) setState(() => _tileProvider = provider);
+  }
+
+  void _fitRoute(List<latlong.LatLng> coordinates) {
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: coordinates,
+        padding: const EdgeInsets.all(32),
+      ),
+    );
+  }
+
+  void _zoomBy(double delta) {
+    final camera = _mapController.camera;
+    _mapController.move(camera.center, camera.zoom + delta);
   }
 
   @override
@@ -58,6 +74,7 @@ class _RouteMapViewState extends State<RouteMapView> {
     }
 
     final colorScheme = Theme.of(context).colorScheme;
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -67,65 +84,174 @@ class _RouteMapViewState extends State<RouteMapView> {
             // Show a neutral surface while the cache provider is loading.
             // This is typically < 50 ms and invisible in practice.
             ? ColoredBox(color: colorScheme.tertiaryContainer)
-            : FlutterMap(
-                options: MapOptions(
-                  initialCameraFit: CameraFit.coordinates(
-                    coordinates: coordinates,
-                    padding: const EdgeInsets.all(32),
-                  ),
-                  // View-only: this is a static recap of a finished route, not
-                  // an interactive or live map.
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.none,
-                  ),
-                ),
+            : Stack(
                 children: [
-                  TileLayer(
-                    urlTemplate:
-                        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.stride',
-                    // Cached tile provider: checks disk first, falls back to
-                    // network. When offline, only already-cached tiles render;
-                    // missing tiles fail gracefully (grey placeholder square)
-                    // without crashing the app.
-                    tileProvider: _tileProvider!,
-                  ),
-                  PolylineLayer(
-                    polylines: [
-                      Polyline(
-                        points: coordinates,
-                        strokeWidth: 4,
-                        color: colorScheme.primary,
+                  FlutterMap(
+                    mapController: _mapController,
+                    options: MapOptions(
+                      initialCameraFit: CameraFit.coordinates(
+                        coordinates: coordinates,
+                        padding: const EdgeInsets.all(32),
+                      ),
+                      onMapReady: () {
+                        if (!_isMapReady) {
+                          setState(() => _isMapReady = true);
+                        }
+                      },
+                      // Users can inspect a completed route, but this remains
+                      // a read-only recap with no navigation or live tracking.
+                      interactionOptions: const InteractionOptions(
+                        flags: InteractiveFlag.all,
+                      ),
+                    ),
+                    children: [
+                      TileLayer(
+                        // Choosing the tile URL from the inherited theme means
+                        // FlutterMap rebuilds with the new tiles immediately when
+                        // the app theme changes. The cache keys each source by URL,
+                        // so light and dark tiles remain independent.
+                        urlTemplate: isDarkMode
+                            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                            : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        subdomains: isDarkMode
+                            ? const ['a', 'b', 'c', 'd']
+                            : const [],
+                        userAgentPackageName: 'com.example.stride',
+                        // Lift CARTO's near-black dark tiles toward the
+                        // blue-grey tone used by Stride, without changing the
+                        // route, endpoint markers, or map controls.
+                        tileBuilder: (context, tileWidget, tile) => isDarkMode
+                            ? ColorFiltered(
+                                colorFilter: const ColorFilter.matrix([
+                                  0.62, 0, 0, 0, 38,
+                                  0, 0.62, 0, 0, 63,
+                                  0, 0, 0.62, 0, 71,
+                                  0, 0, 0, 1, 0,
+                                ]),
+                                child: tileWidget,
+                              )
+                            : tileWidget,
+                        // Cached tile provider: checks disk first, falls back to
+                        // network. When offline, only already-cached tiles render;
+                        // missing tiles fail gracefully (grey placeholder square)
+                        // without crashing the app.
+                        tileProvider: _tileProvider!,
+                      ),
+                      PolylineLayer(
+                        polylines: [
+                          Polyline(
+                            points: coordinates,
+                            strokeWidth: 4,
+                            color: colorScheme.primary,
+                          ),
+                        ],
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: coordinates.first,
+                            width: 26,
+                            height: 26,
+                            child: const _RouteEndpointMarker(
+                              color: Colors.green,
+                              icon: Icons.trip_origin,
+                            ),
+                          ),
+                          Marker(
+                            point: coordinates.last,
+                            width: 26,
+                            height: 26,
+                            child: const _RouteEndpointMarker(
+                              color: Colors.red,
+                              icon: Icons.sports_score,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: coordinates.first,
-                        width: 26,
-                        height: 26,
-                        child: const _RouteEndpointMarker(
-                          color: Colors.green,
-                          icon: Icons.trip_origin,
-                        ),
+                  if (_isMapReady)
+                    Positioned(
+                      right: 10,
+                      bottom: 10,
+                      child: _MapControls(
+                        onZoomIn: () => _zoomBy(1),
+                        onZoomOut: () => _zoomBy(-1),
+                        onFitRoute: () => _fitRoute(coordinates),
                       ),
-                      Marker(
-                        point: coordinates.last,
-                        width: 26,
-                        height: 26,
-                        child: const _RouteEndpointMarker(
-                          color: Colors.red,
-                          icon: Icons.sports_score,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
       ),
     );
   }
+}
+
+class _MapControls extends StatelessWidget {
+  const _MapControls({
+    required this.onZoomIn,
+    required this.onZoomOut,
+    required this.onFitRoute,
+  });
+
+  final VoidCallback onZoomIn;
+  final VoidCallback onZoomOut;
+  final VoidCallback onFitRoute;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Material(
+      color: colors.surface.withValues(alpha: 0.94),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MapControlButton(
+            tooltip: 'Zoom in',
+            icon: Icons.add,
+            onPressed: onZoomIn,
+          ),
+          Divider(height: 1, color: colors.outlineVariant),
+          _MapControlButton(
+            tooltip: 'Zoom out',
+            icon: Icons.remove,
+            onPressed: onZoomOut,
+          ),
+          Divider(height: 1, color: colors.outlineVariant),
+          _MapControlButton(
+            tooltip: 'Fit route',
+            icon: Icons.fit_screen_outlined,
+            onPressed: onFitRoute,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapControlButton extends StatelessWidget {
+  const _MapControlButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: IconButton(
+      onPressed: onPressed,
+      icon: Icon(icon),
+      visualDensity: VisualDensity.compact,
+    ),
+  );
 }
 
 class _RouteEndpointMarker extends StatelessWidget {
