@@ -6,6 +6,10 @@ import 'package:latlong2/latlong.dart' as latlong;
 import '../../../data/database/app_database.dart';
 import '../../../services/tile_cache_service.dart';
 
+/// CARTO now requires a key on raster basemap requests (free tier, 5M
+/// tiles/month) or it serves a watermarked "API key required" tile instead.
+const _cartoApiKey = 'cb1_2utt_1_beaa0985d53ae80b70e0277a';
+
 /// Displays a finished activity's recorded route as a static, view-only map
 /// using OpenStreetMap tiles.
 ///
@@ -111,7 +115,7 @@ class _RouteMapViewState extends State<RouteMapView> {
                         // the app theme changes. The cache keys each source by URL,
                         // so light and dark tiles remain independent.
                         urlTemplate: isDarkMode
-                            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
+                            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png?key=$_cartoApiKey'
                             : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                         subdomains: isDarkMode
                             ? const ['a', 'b', 'c', 'd']
